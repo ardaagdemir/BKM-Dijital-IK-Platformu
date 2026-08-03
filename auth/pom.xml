@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bkm</groupId>
+        <artifactId>dijital-ik-platformu</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>auth</artifactId>
+    <name>auth</name>
+    <description>Kullanıcı girişi ve kimlik doğrulama modülü (roadmap Bölüm 2). Yalnızca core'a bağımlıdır.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-02.2.3: Artık gerçek erişim kısıtlaması gerektiği için
+             spring-security-crypto (yalnızca BCryptPasswordEncoder) yerine tam
+             spring-boot-starter-security'e geçildi. Bilinçli olarak yalnızca BU
+             modülün pom.xml'inde — core'a eklenmedi, çünkü core'un kendi
+             (@WebMvcTest gibi) testleri istemsizce Spring Security'nin varsayılan
+             oturum açma ekranı arkasına düşmesin. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- US-08D.1.4: Bordro erişim doğrulama kodunu e-posta ile göndermek için
+             (bkz. StepUpNotificationService) — leave modülündeki (US-04.3.1)
+             AYNI gerekçeyle eklendi. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Yalnızca test: bu modülü tek başına (bkz. AuthTestApplication) test edebilmek için. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

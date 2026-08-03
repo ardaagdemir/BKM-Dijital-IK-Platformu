@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bkm</groupId>
+        <artifactId>dijital-ik-platformu</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>payroll</artifactId>
+    <name>payroll</name>
+    <description>Bordro ve Bordroya Hazırlık modülü (roadmap Bölüm 8, EPIC-08D). core'a ek olarak
+        leave/attendance/travel'a da bağımlıdır (bkz. US-08D.1.2'deki bilinçli, kullanıcıyla
+        birlikte kararlaştırılan mimari istisna — bu modül roadmap'in kendi tanımıyla "onaylanmış
+        veriyi okuyan bir tüketici"; bağımlılık TEK YÖNLÜ, yalnızca payroll bağımlı olur, tersi
+        değil).</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-08D.1.2: Onaylanmış izin verisini okumak için — bkz. yukarıdaki modül açıklaması. -->
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>leave</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-08D.1.2: PDKS/puantaj verisini okumak için. -->
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>attendance</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-08D.1.2: Onaylanmış masraf kalemi verisini okumak için. -->
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>travel</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Yalnızca test: bu modülü tek başına (bkz. PayrollTestApplication) test edebilmek için. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

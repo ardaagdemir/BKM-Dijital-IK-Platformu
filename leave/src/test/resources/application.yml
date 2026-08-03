@@ -1,0 +1,13 @@
+# US-04.3.1: spring-boot-starter-mail'in JavaMailSender bean'ini yalnızca
+# spring.mail.host tanımlıysa otomatik oluşturması nedeniyle test classpath'inde
+# de bir değer gerekiyor — testler gerçek bir SMTP sunucusuna bağlanmaya
+# çalışmaz (LeaveNotificationService bağlantı hatalarını yutar/loglar), bu
+# yalnızca bean'in var olmasını sağlamak için.
+spring:
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail:
+    from-address: noreply@dijitalik.local

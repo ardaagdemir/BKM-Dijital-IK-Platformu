@@ -1,0 +1,14 @@
+# US-08D.1.2: payroll artık leave'e gerçek bir Maven bağımlılığıyla bağlı
+# (bkz. payroll/pom.xml'deki not); leave, spring-boot-starter-mail'i
+# transitive olarak getiriyor ve LeaveNotificationService bir JavaMailSender
+# bean'i bekliyor — bu, leave/src/test/resources/application.yml'deki (US-04.3.1)
+# AYNI ayar, yalnızca bean'in var olmasını sağlamak için (test gerçek bir SMTP
+# sunucusuna bağlanmaya çalışmaz).
+spring:
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail:
+    from-address: noreply@dijitalik.local

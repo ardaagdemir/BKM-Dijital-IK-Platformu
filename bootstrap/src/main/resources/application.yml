@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: dijital-ik-platformu
+  mvc:
+    problemdetails:
+      enabled: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:dijitalik}
+    username: ${DB_USER:dijitalik}
+    password: ${DB_PASSWORD:dijitalik}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    locations: classpath:db/migration
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+  # US-05.2.1: /api/recruitment/candidates/applications kimliksiz, herkese
+  # açık bir uç olduğundan (bkz. auth.SecurityConfig) makul bir dosya boyutu
+  # sınırı kaba bir kötüye kullanım önlemi.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+app:
+  session:
+    ttl-minutes: 30
+    step-up-code-ttl-minutes: 5
+  security:
+    max-failed-attempts: 5
+    lockout-duration-minutes: 15
+  mail:
+    from-address: ${MAIL_FROM_ADDRESS:noreply@dijitalik.local}

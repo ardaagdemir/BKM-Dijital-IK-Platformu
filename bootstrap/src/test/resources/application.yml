@@ -1,0 +1,22 @@
+# Test classpath'i, src/main/resources/application.yml'in üzerine yazar.
+#
+# Testler gerçek PostgreSQL yerine (Spring Boot'un otomatik yapılandırdığı) bellek içi
+# H2 veritabanını kullanır; bu nedenle Flyway (yalnızca PostgreSQL migration'ları içerir)
+# devre dışı bırakılır ve şema, Hibernate tarafından test varlıklarından (ör. SampleEntity)
+# otomatik üretilir — US-01.1.1/01.2.1'deki orijinal test davranışıyla aynıdır.
+spring:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  # US-04.3.1: leave modülünün JavaMailSender'a bağımlı LeaveNotificationService'i
+  # bu context'e de dahil (bootstrap tüm modülleri toplar) — host tanımlı olmazsa
+  # bean hiç oluşmaz ve context yüklenemez; gerçek bir SMTP sunucusuna bağlanılmaz.
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail:
+    from-address: noreply@dijitalik.local

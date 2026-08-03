@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bkm</groupId>
+        <artifactId>dijital-ik-platformu</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>organization</artifactId>
+    <name>organization</name>
+    <description>Organizasyon yapısı ve çalışan yönetimi modülü (roadmap Bölüm 3), ayrıca doküman yönetimi ve
+        görev tanımları (roadmap Bölüm 8, EPIC-08I — eskiden ayrı `document` modülüydü; `JobDescription`
+        kavramsal olarak zaten `JobTitle`'ın bir uzantısı olduğundan buraya birleştirildi). Yalnızca core'a
+        bağımlıdır.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-03.2.6: Kayıt bazlı yetkilendirme (@PreAuthorize, Authentication,
+             GrantedAuthority) için gerekli. Bilinçli olarak yalnızca
+             spring-security-CORE eklendi — auth modülündeki tam
+             spring-boot-starter-security DEĞİL: bu modül auth'a bağımlı olmadığından
+             (yalnızca core'a bağımlı kuralı korunur) AuthenticatedUser gibi auth-özel
+             sınıflara erişemez, yalnızca Spring Security'nin jenerik
+             Authentication/GrantedAuthority API'sini kullanır. @EnableMethodSecurity,
+             auth modülündeki SecurityConfig'te (uygulama genelinde tek bir Spring
+             context olduğu için) zaten etkin; bu modülün kendisi bunu etkinleştirmez. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Yalnızca test: bu modülü tek başına (bkz. OrganizationTestApplication) test edebilmek için. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

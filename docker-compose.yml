@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dijitalik
+      POSTGRES_USER: dijitalik
+      POSTGRES_PASSWORD: dijitalik
+    ports:
+      # Host tarafında 5433 kullanılıyor; bu makinede 5432'yi zaten kullanan yerel bir
+      # PostgreSQL kurulumu olabilir. Servisler arası iletişim (backend -> postgres)
+      # Docker'ın iç ağı üzerinden, konteyner içindeki standart 5432 portuyla yapılır;
+      # bu satır yalnızca host makineden (ör. psql ile) dışarıdan erişim içindir.
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dijitalik"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # US-04.3.1: Yerel geliştirme/test için SMTP yakalayıcı (gerçek e-posta göndermez,
+  # web arayüzü + REST API üzerinden gelen postaları gösterir). Üretimde MAIL_HOST/
+  # MAIL_PORT/MAIL_FROM_ADDRESS ortam değişkenleri gerçek bir SMTP sağlayıcısına
+  # işaret edecek şekilde ayarlanır; bu servis yalnızca bu compose dosyasında var.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
+  backend:
+    build:
+      context: .
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: dijitalik
+      DB_USER: dijitalik
+      DB_PASSWORD: dijitalik
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

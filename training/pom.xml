@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bkm</groupId>
+        <artifactId>dijital-ik-platformu</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>training</artifactId>
+    <name>training</name>
+    <description>Eğitim yönetimi modülü (roadmap Bölüm 8, EPIC-08A). Yalnızca core'a bağımlıdır.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-08A.1.2: Kayıt bazlı yetkilendirme (@PreAuthorize, hasRole) için gerekli.
+             Bilinçli olarak yalnızca spring-security-CORE — bkz. organization/pom.xml'deki aynı gerekçe. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Yalnızca test: bu modülü tek başına (bkz. TrainingTestApplication) test edebilmek için. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>
