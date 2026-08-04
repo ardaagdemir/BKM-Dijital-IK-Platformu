@@ -33,6 +33,7 @@
     -->
     <modules>
         <module>core</module>
+        <module>platform</module>
         <module>auth</module>
         <module>organization</module>
         <module>leave</module>

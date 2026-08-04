@@ -25,6 +25,12 @@
 
         <dependency>
             <groupId>com.bkm</groupId>
+            <artifactId>platform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bkm</groupId>
             <artifactId>auth</artifactId>
             <version>${project.version}</version>
         </dependency>

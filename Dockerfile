@@ -5,6 +5,7 @@ WORKDIR /build
 # Docker layer cache'inden gelsin.
 COPY pom.xml .
 COPY core/pom.xml core/
+COPY platform/pom.xml platform/
 COPY auth/pom.xml auth/
 COPY organization/pom.xml organization/
 COPY leave/pom.xml leave/
@@ -21,6 +22,7 @@ COPY bootstrap/pom.xml bootstrap/
 RUN mvn -B dependency:go-offline
 
 COPY core/src core/src
+COPY platform/src platform/src
 COPY auth/src auth/src
 COPY organization/src organization/src
 COPY leave/src leave/src

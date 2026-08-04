@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.bkm</groupId>
+        <artifactId>dijital-ik-platformu</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>platform</artifactId>
+    <name>platform</name>
+    <description>Çapraz-kesen "meta" yetenekler modülü (roadmap Bölüm 9): onay zinciri motoru (US-09.2.1/2),
+        dinamik özel alan çerçevesi (US-09.5.1), genel dosya saklama (US-09.7.1) ve virüs tarama (US-09.7.2).
+        Bunlar `core`'a girmeyecek kadar iş mantığı içeriyor (core'un kendi ADR'si: yalnızca paylaşılan
+        altyapı) ama tek bir business modülüne de ait değil — bu yüzden TEK bir modülde toplandı, 4 ayrı
+        küçük modül açıp "17 modül fazla" sorununu tekrarlamamak için. Yalnızca core'a bağımlıdır;
+        `recruitment`/`organization` gibi tüketici modüller `payroll`'un leave/attendance/travel'a olan
+        AYNI tek-yönlü istisna deseniyle buna bağımlı olur.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-09.2.2: Onay zinciri admin API'si için @PreAuthorize gerekli.
+             Bilinçli olarak yalnızca spring-security-CORE eklendi —
+             organization/leave/training/travel/amenities modüllerindeki AYNI
+             gerekçe: bu modül auth'a bağımlı olmadığından yalnızca Spring
+             Security'nin jenerik Authentication/GrantedAuthority API'sini
+             kullanır. @EnableMethodSecurity, auth modülündeki SecurityConfig'te
+             zaten etkin. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Yalnızca test: bu modülü tek başına (bkz. PlatformTestApplication) test edebilmek için. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>
