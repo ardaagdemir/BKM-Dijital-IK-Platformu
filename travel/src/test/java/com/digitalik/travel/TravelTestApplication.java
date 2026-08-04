@@ -10,9 +10,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * gerek kalmadan tek başına test edebilmek için kullanılan, yalnızca teste özgü bir
  * başlangıç sınıfı. Ayrıntılı gerekçe için bkz. {@code auth.AuthTestApplication}.
  */
-@SpringBootApplication(scanBasePackages = {"com.digitalik.travel", "com.digitalik.core"})
-@EntityScan(basePackages = {"com.digitalik.travel", "com.digitalik.core"})
-@EnableJpaRepositories(basePackages = {"com.digitalik.travel", "com.digitalik.core"})
+@SpringBootApplication(scanBasePackages = {"com.digitalik.travel", "com.digitalik.core", "com.digitalik.platform"})
+@EntityScan(basePackages = {"com.digitalik.travel", "com.digitalik.core", "com.digitalik.platform"})
+@EnableJpaRepositories(basePackages = {"com.digitalik.travel", "com.digitalik.core", "com.digitalik.platform"})
 class TravelTestApplication {
 
     public static void main(String[] args) {

@@ -2912,3 +2912,38 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## Yeni `platform` modülü + US-09.7.1 — Genel dosya saklama servisi
+
+**Özet:** Bölüm 9'daki birkaç madde (onay motoru, dinamik alan çerçevesi, dosya saklama, virüs tarama) `core`'a girmeyecek kadar iş mantığı içeriyor ama tek bir business modülüne de ait değil — bunlar için `platform` adında TEK bir yeni modül açıldı (yalnızca `core`'a bağımlı; 4 ayrı küçük modül açıp "17→14 modül" konsolidasyonunu tekrar bozmamak için). İlk içeriği: `platform.file.FileStorageService` (US-09.7.1). Kabul kriteri: "Servis, meta veri + ikili içeriği ayrı katmanlarda tutar; mevcut modüller buna taşınır."
+
+**Tasarım kararları:**
+- **3 mevcut blob implementasyonundan (`organization.PolicyDocument`, `recruitment.Candidate.cvData`, `travel.ExpenseItem`) YALNIZCA `travel.ExpenseItem` bu servise TAŞINDI** — `PolicyDocument`'ın kendi versiyonlama mantığı ve `Candidate.cvData`'nın mevcut, test edilmiş multipart akışı bu genellemeye zorla sığdırılırsa gereksiz regresyon riski yaratırdı; `ExpenseItem` üçü içinde en basit/en az test riskli olanıydı. Bu, genellemenin GERÇEKTEN çalıştığını kanıtlayan somut bir örnek — PolicyDocument/Candidate BİLİNÇLİ OLARAK olduğu gibi bırakıldı (virüs tarama, US-09.7.2'de, yine de o ikisinin akışlarına AYRICA doğrudan entegre edilecek).
+- **`travel`, `platform`'a YENİ bir tek-yönlü bağımlılık kazandı** — `payroll`'un `leave`/`attendance`/`travel`'a olan MEVCUT istisnasının AYNI deseninin bir örneği daha (bkz. `platform/pom.xml`'deki gerekçe).
+- **`ExpenseItem.documentFileName`/`documentContentType`/`documentData` (3 alan) → tek bir `storedFileId` (GERÇEK bir DB FK, `stored_files(id)`'e)** — diğer modüller-arası `employeeId` gibi FK'siz referanslardan BİLİNÇLİ OLARAK FARKLI: `StoredFile` gerçekten `platform`'un sahipliğinde ve `travel` ona gerçek bir Maven bağımlılığıyla bağlı, bu yüzden gerçek bir FK anlamlı.
+- **Dış API/JSON sözleşmesi HİÇ DEĞİŞMEDİ** — `ExpenseItemResponse` hâlâ `documentFileName`/`documentContentType` alanlarını taşıyor; `ExpenseItemController.toResponse` artık `ExpenseItemService.getDocument(storedFileId)` ile `StoredFile`'ı ayrıca okuyup bu alanları ORADAN dolduruyor. Mevcut 6 `ExpenseItemControllerTest` testi HİÇ DEĞİŞTİRİLMEDEN geçti — regresyon yok.
+- **Migration sıralaması ÖNEMLİ:** `platform`'un `V62__create_stored_files.sql`'i, `travel`'ın `stored_file_id` FK'sini ekleyen `V63`'ünden ÖNCE gelmeli — Flyway migration'ları HANGİ modülün kaynak klasöründe olduğuna bakmaksızın TÜM modüllerin classpath'teki dosyalarını sürüm numarasına göre sıralı uyguladığından, bu sıralama numaralandırmayla garanti edildi.
+
+**Değişen/eklenen dosyalar:**
+- `platform/` (yeni modül) — `pom.xml`, `PlatformTestApplication.java`, test `application.yml` (mail+şifreleme cascade config)
+- `platform/src/main/resources/db/migration/V62__create_stored_files.sql` (yeni)
+- `platform/src/main/java/com/digitalik/platform/file/StoredFile.java`, `StoredFileRepository.java`, `StoredFileNotFoundException.java`, `FileStorageService.java` (yeni)
+- `platform/src/test/java/com/digitalik/platform/file/FileStorageServiceTest.java` (yeni, 4 test)
+- `pom.xml`, `bootstrap/pom.xml`, `Dockerfile` — `platform` girdisi eklendi
+- `travel/pom.xml` — `platform` bağımlılığı eklendi
+- `travel/src/main/resources/db/migration/V63__migrate_expense_item_documents_to_stored_files.sql` (yeni)
+- `travel/src/main/java/com/digitalik/travel/entity/ExpenseItem.java` — 3 alan → `storedFileId`
+- `travel/src/main/java/com/digitalik/travel/service/ExpenseItemService.java`, `controller/ExpenseItemController.java`, `exception/TravelExceptionHandler.java` — `FileStorageService` entegrasyonu
+- `travel/src/test/java/com/digitalik/travel/TravelTestApplication.java`, `payroll/src/test/java/com/digitalik/payroll/PayrollTestApplication.java` — tarama kapsamına `com.digitalik.platform` eklendi
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı; "Migrating schema "public" to version "62 - create stored files"", "...63 - migrate expense item documents to stored files"", "Successfully applied 63 migrations". Seyahat talebi + belgeli masraf kalemi oluşturuldu (multipart, 201) → yanıt `documentFileName`/`documentContentType`'ı doğru gösterdi; `GET` listesi de aynı şekilde doğru. `psql` ile DOĞRUDAN kontrol: `expense_items` tablosunda artık `document_*` kolonları YOK, yalnızca `stored_file_id` (gerçek FK, `expense_items_stored_file_id_fkey`); `stored_files` tablosunda dosya gerçekten ayrı bir satır olarak (doğru `file_name`/`content_type`/20 baytlık içerik) duruyor. Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (30), platform (4), auth (28), organization (75), leave (53), recruitment (39), performance (44), attendance (28), training (22), travel (18), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 450 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

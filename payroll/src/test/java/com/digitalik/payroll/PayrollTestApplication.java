@@ -15,6 +15,11 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * bağımlılığıyla bağlı (bkz. {@code payroll/pom.xml}'deki not); izole test
  * bağlamının da bu modüllerin repository/servis bean'lerini bulabilmesi
  * gerekiyor.
+ *
+ * <p>US-09.7.1: {@code com.digitalik.platform} da eklendi — {@code
+ * travel.ExpenseItemService} artık {@code platform.file.FileStorageService}'e
+ * bağımlı (transitive Maven bağımlılığı zaten var, ama izole test bağlamının
+ * bean'i bulabilmesi için tarama kapsamı da genişlemeli).
  */
 @SpringBootApplication(
         scanBasePackages = {
@@ -22,7 +27,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.core",
             "com.digitalik.leave",
             "com.digitalik.attendance",
-            "com.digitalik.travel"
+            "com.digitalik.travel",
+            "com.digitalik.platform"
         })
 @EntityScan(
         basePackages = {
@@ -30,7 +36,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.core",
             "com.digitalik.leave",
             "com.digitalik.attendance",
-            "com.digitalik.travel"
+            "com.digitalik.travel",
+            "com.digitalik.platform"
         })
 @EnableJpaRepositories(
         basePackages = {
@@ -38,7 +45,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.core",
             "com.digitalik.leave",
             "com.digitalik.attendance",
-            "com.digitalik.travel"
+            "com.digitalik.travel",
+            "com.digitalik.platform"
         })
 class PayrollTestApplication {
 

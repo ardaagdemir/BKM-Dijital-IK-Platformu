@@ -1,6 +1,8 @@
 package com.digitalik.travel.service;
 
 import com.digitalik.core.approval.ApprovalDecisionValidator;
+import com.digitalik.platform.file.FileStorageService;
+import com.digitalik.platform.file.StoredFile;
 import com.digitalik.travel.entity.ExpenseItem;
 import com.digitalik.travel.entity.ExpenseItemStatus;
 import com.digitalik.travel.exception.ExpenseItemNotFoundException;
@@ -11,17 +13,26 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
-/** US-08B.1.2: Masraf kalemi beyanı (tutar + belge) — kabul kriteri "Her kalem tutar+belge ile kaydedilir" diyor. */
+/**
+ * US-08B.1.2: Masraf kalemi beyanı (tutar + belge) — kabul kriteri "Her kalem tutar+belge ile kaydedilir" diyor.
+ *
+ * <p>US-09.7.1: Belge, {@code platform.file.FileStorageService} üzerinden
+ * {@code StoredFile} olarak saklanıyor — bkz. {@code ExpenseItem}'ın javadoc'u.
+ */
 @Service
 public class ExpenseItemService {
 
     private final ExpenseItemRepository expenseItemRepository;
     private final TravelRequestRepository travelRequestRepository;
+    private final FileStorageService fileStorageService;
 
     public ExpenseItemService(
-            ExpenseItemRepository expenseItemRepository, TravelRequestRepository travelRequestRepository) {
+            ExpenseItemRepository expenseItemRepository,
+            TravelRequestRepository travelRequestRepository,
+            FileStorageService fileStorageService) {
         this.expenseItemRepository = expenseItemRepository;
         this.travelRequestRepository = travelRequestRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     public ExpenseItem create(
@@ -43,8 +54,13 @@ public class ExpenseItemService {
             throw new IllegalArgumentException("Belge boş olamaz.");
         }
 
-        return expenseItemRepository.save(
-                new ExpenseItem(travelRequestId, amount, documentFileName, documentContentType, documentData));
+        StoredFile storedFile = fileStorageService.store(documentFileName, documentContentType, documentData);
+        return expenseItemRepository.save(new ExpenseItem(travelRequestId, amount, storedFile.getId()));
+    }
+
+    /** US-09.7.1: {@code ExpenseItem} artık belge meta verisini tutmuyor — görüntüleme için {@code StoredFile}'dan okunur. */
+    public StoredFile getDocument(Long storedFileId) {
+        return fileStorageService.retrieve(storedFileId);
     }
 
     public List<ExpenseItem> listByTravelRequest(Long travelRequestId) {

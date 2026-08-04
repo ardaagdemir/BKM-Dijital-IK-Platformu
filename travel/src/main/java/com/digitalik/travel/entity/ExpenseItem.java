@@ -7,19 +7,20 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
  * US-08B.1.2: Bir seyahat talebine (bkz. {@link TravelRequest}) bağlı masraf
  * kalemi — tutar + belge (makbuz/fatura). {@code travelRequestId}, AYNI
  * modül içindeki {@link TravelRequest}'e normal bir FK ile bağlı.
  *
- * <p>{@code documentData}, {@code recruitment.Candidate.cvData}'daki (V23)
- * AYNI dersle {@code @JdbcTypeCode(SqlTypes.VARBINARY)} ile eşlendi — {@code
- * @Lob} DEĞİL, aksi halde Hibernate PostgreSQL'de bunu {@code oid}
- * mekanizmasına eşler ve düz bir {@code bytea} sütunuyla şema doğrulaması
- * canlıda başarısız olur.
+ * <p>US-09.7.1: Belgenin kendisi ({@code fileName}/{@code contentType}/
+ * ikili içerik) artık BURADA DEĞİL — {@code storedFileId}, {@code
+ * platform.file.StoredFile}'a GERÇEK bir FK ile bağlı (bkz. {@code
+ * com.digitalik.platform.file.FileStorageService}). Bu, diğer modüller-arası
+ * {@code employeeId} gibi referanslardan FARKLI: {@code StoredFile}
+ * gerçekten {@code platform} modülünün sahipliğinde ve {@code travel} ona
+ * Maven bağımlılığıyla gerçekten bağlı (payroll'un leave/attendance/travel'a
+ * olan AYNI tek-yönlü istisna deseni).
  *
  * <p>US-08B.1.3: {@code status}/{@link #approve()}/{@link #reject(String)} —
  * {@code leave.LeaveRequest}/{@code training.TrainingEnrollment}'teki AYNI
@@ -37,14 +38,7 @@ public class ExpenseItem extends BaseEntity {
     private BigDecimal amount;
 
     @Column(nullable = false)
-    private String documentFileName;
-
-    @Column(nullable = false)
-    private String documentContentType;
-
-    @JdbcTypeCode(SqlTypes.VARBINARY)
-    @Column(nullable = false)
-    private byte[] documentData;
+    private Long storedFileId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -56,17 +50,10 @@ public class ExpenseItem extends BaseEntity {
         // JPA için
     }
 
-    public ExpenseItem(
-            Long travelRequestId,
-            BigDecimal amount,
-            String documentFileName,
-            String documentContentType,
-            byte[] documentData) {
+    public ExpenseItem(Long travelRequestId, BigDecimal amount, Long storedFileId) {
         this.travelRequestId = travelRequestId;
         this.amount = amount;
-        this.documentFileName = documentFileName;
-        this.documentContentType = documentContentType;
-        this.documentData = documentData;
+        this.storedFileId = storedFileId;
         this.status = ExpenseItemStatus.PENDING;
     }
 
@@ -87,16 +74,8 @@ public class ExpenseItem extends BaseEntity {
         return amount;
     }
 
-    public String getDocumentFileName() {
-        return documentFileName;
-    }
-
-    public String getDocumentContentType() {
-        return documentContentType;
-    }
-
-    public byte[] getDocumentData() {
-        return documentData;
+    public Long getStoredFileId() {
+        return storedFileId;
     }
 
     public ExpenseItemStatus getStatus() {

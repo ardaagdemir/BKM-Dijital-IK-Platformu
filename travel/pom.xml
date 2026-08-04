@@ -12,12 +12,20 @@
 
     <artifactId>travel</artifactId>
     <name>travel</name>
-    <description>Harcırah/Seyahat/Avans ve Masraf yönetimi modülü (roadmap Bölüm 8, EPIC-08B). Yalnızca core'a bağımlıdır.</description>
+    <description>Harcırah/Seyahat/Avans ve Masraf yönetimi modülü (roadmap Bölüm 8, EPIC-08B). Yalnızca
+        core'a, ARTI US-09.7.1 için platform'a bağımlıdır (payroll'un leave/attendance/travel'a olan AYNI
+        tek-yönlü istisna deseninin bir örneği daha — bkz. platform/pom.xml'deki gerekçe).</description>
 
     <dependencies>
         <dependency>
             <groupId>com.bkm</groupId>
             <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>platform</artifactId>
             <version>${project.version}</version>
         </dependency>
 

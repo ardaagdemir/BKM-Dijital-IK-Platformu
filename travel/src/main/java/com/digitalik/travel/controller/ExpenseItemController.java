@@ -1,5 +1,6 @@
 package com.digitalik.travel.controller;
 
+import com.digitalik.platform.file.StoredFile;
 import com.digitalik.travel.dto.ExpenseItemDecisionRequest;
 import com.digitalik.travel.dto.ExpenseItemResponse;
 import com.digitalik.travel.entity.ExpenseItem;
@@ -65,7 +66,7 @@ public class ExpenseItemController {
     @GetMapping
     public List<ExpenseItemResponse> list(@PathVariable Long travelRequestId) {
         return expenseItemService.listByTravelRequest(travelRequestId).stream()
-                .map(ExpenseItemController::toResponse)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -84,13 +85,15 @@ public class ExpenseItemController {
         }
     }
 
-    private static ExpenseItemResponse toResponse(ExpenseItem expenseItem) {
+    /** US-09.7.1: Belge meta verisi artık {@code ExpenseItem} üzerinde değil, {@code StoredFile}'dan okunuyor. */
+    private ExpenseItemResponse toResponse(ExpenseItem expenseItem) {
+        StoredFile document = expenseItemService.getDocument(expenseItem.getStoredFileId());
         return new ExpenseItemResponse(
                 expenseItem.getId(),
                 expenseItem.getTravelRequestId(),
                 expenseItem.getAmount(),
-                expenseItem.getDocumentFileName(),
-                expenseItem.getDocumentContentType(),
+                document.getFileName(),
+                document.getContentType(),
                 expenseItem.getStatus().name(),
                 expenseItem.getRejectionReason());
     }
