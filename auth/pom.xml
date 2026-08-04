@@ -40,6 +40,17 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- US-09.1.3: RFC 6238 TOTP tabanlı MFA — bağımsız/self-hosted, gerçek bir
+             AD/LDAP/SSO sağlayıcısı GEREKTİRMİYOR (kullanıcıyla mutabık kalınan
+             kapsam kararı). Küçük, bağımsız, MIT lisanslı; sır üretimi + kod
+             doğrulamasının HMAC/zaman-penceresi mantığını elle yeniden yazmak
+             yerine kanıtlanmış bir kütüphane kullanılıyor. -->
+        <dependency>
+            <groupId>dev.samstevens.totp</groupId>
+            <artifactId>totp</artifactId>
+            <version>1.7.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

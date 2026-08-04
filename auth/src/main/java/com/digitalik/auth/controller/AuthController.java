@@ -1,7 +1,9 @@
 package com.digitalik.auth.controller;
 
+import com.digitalik.auth.dto.ConfirmMfaRequest;
 import com.digitalik.auth.dto.LoginRequest;
 import com.digitalik.auth.dto.LoginResponse;
+import com.digitalik.auth.dto.MfaEnrollResponse;
 import com.digitalik.auth.dto.ProfileResponse;
 import com.digitalik.auth.dto.SessionResponse;
 import com.digitalik.auth.dto.VerifyPayrollAccessRequest;
@@ -70,6 +72,37 @@ public class AuthController {
     public ResponseEntity<Void> verifyPayrollAccess(
             @AuthenticationPrincipal AuthenticatedUser principal, @RequestBody VerifyPayrollAccessRequest request) {
         authService.verifyPayrollAccess(principal.token(), request.code());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * US-09.1.3: TOTP kaydını başlatır — dönen {@code secret}/{@code
+     * otpAuthUri}, bir authenticator uygulamasına (Google Authenticator/
+     * Authy) elle veya QR ile eklenir. Kayıt {@link #confirmMfaEnrollment}
+     * ile İLK kod doğrulanana kadar AKTİF değildir.
+     */
+    @PostMapping("/mfa/enroll")
+    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return authService.enrollMfa(principal.token());
+    }
+
+    @PostMapping("/mfa/enroll/confirm")
+    public ResponseEntity<Void> confirmMfaEnrollment(
+            @AuthenticationPrincipal AuthenticatedUser principal, @RequestBody ConfirmMfaRequest request) {
+        authService.confirmMfaEnrollment(principal.token(), request.code());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * US-09.1.3: Bordro erişimi için {@link #verifyPayrollAccess}'in
+     * (e-posta kodu) ALTERNATİFİ — TOTP etkinse, e-posta koduna hiç GEREK
+     * KALMADAN doğrudan authenticator uygulamasındaki kodla erişim
+     * yükseltilebilir.
+     */
+    @PostMapping("/payroll-access/verify-totp")
+    public ResponseEntity<Void> verifyPayrollAccessTotp(
+            @AuthenticationPrincipal AuthenticatedUser principal, @RequestBody VerifyPayrollAccessRequest request) {
+        authService.verifyPayrollAccessTotp(principal.token(), request.code());
         return ResponseEntity.noContent().build();
     }
 }

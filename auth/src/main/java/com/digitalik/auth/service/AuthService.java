@@ -1,6 +1,7 @@
 package com.digitalik.auth.service;
 
 import com.digitalik.auth.dto.LoginResponse;
+import com.digitalik.auth.dto.MfaEnrollResponse;
 import com.digitalik.auth.dto.ProfileResponse;
 import com.digitalik.auth.dto.SessionResponse;
 import com.digitalik.auth.entity.Role;
@@ -24,16 +25,19 @@ public class AuthService {
     private final LoginAttemptService loginAttemptService;
     private final UserRoleService userRoleService;
     private final StepUpNotificationService stepUpNotificationService;
+    private final TotpService totpService;
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
             SessionService sessionService, LoginAttemptService loginAttemptService,
-            UserRoleService userRoleService, StepUpNotificationService stepUpNotificationService) {
+            UserRoleService userRoleService, StepUpNotificationService stepUpNotificationService,
+            TotpService totpService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.sessionService = sessionService;
         this.loginAttemptService = loginAttemptService;
         this.userRoleService = userRoleService;
         this.stepUpNotificationService = stepUpNotificationService;
+        this.totpService = totpService;
     }
 
     public LoginResponse login(String email, String rawPassword) {
@@ -88,5 +92,58 @@ public class AuthService {
     /** US-08D.1.4: Gönderilen kodu doğrular — başarılıysa mevcut oturum bordro erişimi için "yükseltilmiş" sayılır. */
     public void verifyPayrollAccess(String token, String code) {
         sessionService.verifyStepUp(token, code);
+    }
+
+    /**
+     * US-09.1.3: TOTP kaydını BAŞLATIR — yeni bir sır üretip kullanıcıya
+     * işler (henüz {@link #confirmMfaEnrollment} ile DOĞRULANMADI, {@code
+     * User.totpEnabled} hâlâ {@code false}). Yeniden çağrılırsa (ör.
+     * kullanıcı cihaz değiştirdi) ÖNCEKİ sırrın ÜZERİNE yazar.
+     */
+    public MfaEnrollResponse enrollMfa(String token) {
+        Session session = sessionService.validate(token);
+        User user = userRepository.findById(session.getUserId()).orElseThrow(InvalidSessionException::new);
+
+        String secret = totpService.generateSecret();
+        user.enrollTotp(secret);
+        userRepository.save(user);
+
+        return new MfaEnrollResponse(secret, totpService.buildOtpAuthUri(user.getEmail(), secret));
+    }
+
+    /** US-09.1.3: İlk kod başarıyla doğrulanınca TOTP GERÇEKTEN aktif hale gelir. */
+    public void confirmMfaEnrollment(String token, String code) {
+        Session session = sessionService.validate(token);
+        User user = userRepository.findById(session.getUserId()).orElseThrow(InvalidSessionException::new);
+
+        if (user.getTotpSecret() == null) {
+            throw new IllegalArgumentException("Önce TOTP kaydı başlatılmalıdır.");
+        }
+        if (!totpService.verifyCode(user.getTotpSecret(), code)) {
+            throw new IllegalArgumentException("Doğrulama kodu hatalı.");
+        }
+
+        user.confirmTotp();
+        userRepository.save(user);
+    }
+
+    /**
+     * US-09.1.3: Bordro erişimi için {@link #verifyPayrollAccess}'in
+     * (e-posta kodu) ALTERNATİFİ — {@code PayrollStepUpFilter} hangi
+     * yöntemle doğrulandığını umursamıyor, ikisi de AYNI şekilde {@code
+     * Session.markStepUpVerified()}'a çıkıyor.
+     */
+    public void verifyPayrollAccessTotp(String token, String code) {
+        Session session = sessionService.validate(token);
+        User user = userRepository.findById(session.getUserId()).orElseThrow(InvalidSessionException::new);
+
+        if (!user.isTotpEnabled()) {
+            throw new IllegalArgumentException("TOTP etkin değil.");
+        }
+        if (!totpService.verifyCode(user.getTotpSecret(), code)) {
+            throw new IllegalArgumentException("Doğrulama kodu hatalı.");
+        }
+
+        sessionService.markStepUpVerified(token);
     }
 }

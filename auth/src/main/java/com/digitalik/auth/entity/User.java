@@ -31,6 +31,23 @@ public class User extends BaseEntity {
     @Column
     private Instant lockedUntil;
 
+    /**
+     * US-09.1.3: {@code Session}'daki e-posta step-up koduna (V60) EK bir
+     * ALTERNATİF — {@code auth.security.PayrollStepUpFilter} hangi
+     * yöntemle doğrulandığını umursamıyor, yalnızca {@code
+     * Session.isStepUpVerified()}'a bakıyor. Sır burada (Session'da DEĞİL)
+     * çünkü kalıcı olmalı — oturum logout'ta silinir, TOTP kaydı kalmalı.
+     */
+    @Column(name = "totp_secret")
+    private String totpSecret;
+
+    /** {@code totp_enabled=false} + {@code totp_secret != null}: kayıt BAŞLATILDI ama ilk kodla henüz DOĞRULANMADI. */
+    @Column(nullable = false)
+    private boolean totpEnabled = false;
+
+    @Column
+    private Instant totpEnrolledAt;
+
     protected User() {
         // JPA için
     }
@@ -83,5 +100,30 @@ public class User extends BaseEntity {
     public void resetLockout() {
         this.failedLoginAttempts = 0;
         this.lockedUntil = null;
+    }
+
+    /** Yeni bir sır üretilip kayıt BAŞLATILDIĞINDA — henüz {@link #confirmTotp()} ile DOĞRULANMADI. */
+    public void enrollTotp(String secret) {
+        this.totpSecret = secret;
+        this.totpEnabled = false;
+        this.totpEnrolledAt = null;
+    }
+
+    /** İlk kod başarıyla doğrulandığında TOTP GERÇEKTEN aktif hale gelir. */
+    public void confirmTotp() {
+        this.totpEnabled = true;
+        this.totpEnrolledAt = Instant.now();
+    }
+
+    public String getTotpSecret() {
+        return totpSecret;
+    }
+
+    public boolean isTotpEnabled() {
+        return totpEnabled;
+    }
+
+    public Instant getTotpEnrolledAt() {
+        return totpEnrolledAt;
     }
 }

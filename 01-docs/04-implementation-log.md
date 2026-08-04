@@ -3118,4 +3118,46 @@ docker compose up --build -d
 docker compose down
 ```
 
-Sıradaki adım: **A** (TOTP tabanlı MFA).
+---
+
+## US-09.1.3 — TOTP tabanlı MFA
+
+**Özet:** `auth.service.TotpService` + `User.totpSecret/totpEnabled` — kabul kriteri: "TOTP kaydı yapılabilir; onaylı kod ile bordro erişimi yükseltilebilir." Mevcut e-posta step-up akışına (US-08D.1.4) EK bir ALTERNATİF doğrulama yolu — e-posta kodu akışı hiç DEĞİŞMEDİ/SİLİNMEDİ, TOTP yeni bir seçenek olarak eklendi. Roadmap'in AD/LDAP/SSO'ya (US-09.1.1/09.1.2) resmi bağımlılığı BİLİNÇLİ OLARAK görmezden gelinip, bağımsız/self-hosted olarak yapıldı (kullanıcıyla AskUserQuestion ile mutabık kalınan kapsam kararı).
+
+**Tasarım kararları:**
+- **`dev.samstevens.totp:totp:1.7.1`** — RFC 6238, Google Authenticator/Authy uyumlu, küçük/bağımsız/MIT lisanslı. Yalnızca `SecretGenerator`/`CodeVerifier` (HMAC/zaman-penceresi mantığı) kullanıldı; QR GÖRSELİ üretimi (kütüphanenin zxing'e dayanan kısmı) BİLİNÇLİ OLARAK kullanılmadı — `otpauth://` URI'si (`TotpService.buildOtpAuthUri`) elle üretiliyor, projenin "önce backend API, ekran sonra" deseniyle tutarlı (henüz hiçbir modülde admin/kullanıcı ekranı yok; ilerideki bir frontend bu URI'den kendi QR'ını üretebilir).
+- **Sır (`totpSecret`), `Session`'da DEĞİL `auth.entity.User`'da** — `Session.stepUpCode`'un AKSİNE kalıcı olmalı: oturum logout'ta silinir, ama TOTP kaydı KALICI olmalı (bir kullanıcı authenticator uygulamasına telefonuna EKLEDİĞİ sırrı, her girişte yeniden kaydetmek zorunda kalmamalı).
+- **İki aşamalı durum: `totpEnabled=false` + `totpSecret != null` = "kayıt BAŞLATILDI ama henüz DOĞRULANMADI"** — `User.enrollTotp(secret)` yalnızca sırrı kaydeder, `User.confirmTotp()` (İLK kod başarıyla doğrulandığında) `totpEnabled=true` yapar. Bu ayrım, kullanıcının authenticator'a EKLEMEDEN (ör. QR'ı hiç okutmadan) TOTP'yi "aktif" saymasını ENGELLER.
+- **`SessionService.markStepUpVerified(token)` (yeni, kod PARAMETRESİ YOK)** — `verifyStepUp(token, code)`'un (e-posta yolu, `Session.stepUpCode` alanlarını kontrol eder) AKSİNE, TOTP kodunun doğruluğu `AuthService` tarafından ÖNCEDEN kontrol edilmiş olduğundan bu metot yalnızca oturumu "yükseltir" — iki yol da AYNI `Session.markStepUpVerified()`'a çıkar, `auth.security.PayrollStepUpFilter` HİÇ DEĞİŞMEDİ (yalnızca `session.isStepUpVerified()`'a bakıyor, HANGİ yöntemle doğrulandığını umursamıyor) — kabul kriterinin ("mevcut mekanizmayı bozmadan") doğrudan kanıtı.
+- **`POST /api/auth/mfa/enroll`, `POST /api/auth/mfa/enroll/confirm`, `POST /api/auth/payroll-access/verify-totp`** — üçü de `@AuthenticationPrincipal AuthenticatedUser`'dan token/userId alıyor, `AuthController`'ın diğer uçlarıyla AYNI desen.
+
+**Değişen/eklenen dosyalar:**
+- `auth/pom.xml` — `dev.samstevens.totp:totp:1.7.1` bağımlılığı
+- `auth/src/main/resources/db/migration/V69__add_totp_fields_to_users.sql` (yeni)
+- `auth/src/main/java/com/digitalik/auth/entity/User.java` — `totpSecret`/`totpEnabled`/`totpEnrolledAt`, `enrollTotp`/`confirmTotp`
+- `auth/src/main/java/com/digitalik/auth/service/TotpService.java` (yeni)
+- `auth/src/main/java/com/digitalik/auth/service/SessionService.java` — `markStepUpVerified(token)` (yeni)
+- `auth/src/main/java/com/digitalik/auth/service/AuthService.java` — `enrollMfa`, `confirmMfaEnrollment`, `verifyPayrollAccessTotp`
+- `auth/src/main/java/com/digitalik/auth/dto/MfaEnrollResponse.java`, `ConfirmMfaRequest.java` (yeni)
+- `auth/src/main/java/com/digitalik/auth/controller/AuthController.java` — 3 yeni uç
+- `auth/src/test/java/com/digitalik/auth/service/TotpServiceTest.java` (6 test, yeni)
+- `auth/src/test/java/com/digitalik/auth/controller/AuthControllerTest.java` — 3 yeni test (kayıt+onay+bordro erişimi, yanlış kod, kayıtsız erişim denemesi)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE tamamlandı; V69 uygulandı ("Successfully applied 69 migrations"). `POST /api/auth/mfa/enroll` → sır + `otpauth://totp/...` URI'si döndü; yanlış kodla (`000000`) `POST .../enroll/confirm` → 400 "Doğrulama kodu hatalı."; sırdan RFC 6238 ile hesaplanan GÜNCEL kodla (elle yazılmış bir Python TOTP üreticisiyle — gerçek bir authenticator uygulamasının yapacağı AYNI hesaplama) → 204, `psql` ile `users.totp_enabled=t` doğrulandı. **2FA alternatif-yol kanıtı:** step-up doğrulanmamış oturumla `GET /api/payroll/bank-payment-file` → 403; e-posta kodu akışına HİÇ DOKUNMADAN, doğrudan `POST /api/auth/payroll-access/verify-totp` (güncel TOTP koduyla) → 204; aynı uç → 200 (ERİŞİM YÜKSELTİLDİ). Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn -pl auth -am test
+mvn test   # tam reactor, BUILD SUCCESS, sıfır regresyon
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```
+
+---
+
+## Bölüm 9 — Ara durum notu (checkpoint #2)
+
+9/10 madde tamamlandı: **C, D, I, platform iskeleti, F, G, B, E, H, A**. Kalan tek madde: **J — US-09.10.2** (zamanlanmış veritabanı yedeği, `prodrigestivill/postgres-backup-local` Docker servisi + canlı al→sıfırla→geri-yükle doğrulaması) — planın son maddesi, tamamen bağımsız. Kapsam dışı bırakılanlar değişmedi (bkz. yukarıdaki checkpoint #1).
+
+Sıradaki adım: **J** (zamanlanmış veritabanı yedeği) — Bölüm 9'un SON maddesi.

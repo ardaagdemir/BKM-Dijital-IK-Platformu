@@ -89,6 +89,19 @@ public class SessionService {
         return sessionRepository.save(session);
     }
 
+    /**
+     * US-09.1.3: TOTP yoluyla doğrulama — {@link #verifyStepUp}'ın AKSİNE
+     * e-posta koduna (stepUpCode) hiç bakmaz/gerektirmez. Kodun kendisinin
+     * doğruluğu ({@code AuthService.verifyPayrollAccessTotp}) çağıran
+     * tarafından ÖNCEDEN kontrol edilmiş olmalı — bu metot yalnızca oturumu
+     * "yükseltir".
+     */
+    public Session markStepUpVerified(String token) {
+        Session session = validate(token);
+        session.markStepUpVerified();
+        return sessionRepository.save(session);
+    }
+
     private static String generateToken() {
         byte[] bytes = new byte[32];
         TOKEN_RANDOM.nextBytes(bytes);
