@@ -2983,3 +2983,41 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## US-09.2.1/US-09.2.2 — Onay zinciri motoru + recruitment migrasyonu
+
+**Özet:** `platform.approval` paketi (`ApprovalChainDefinition`/`ApprovalChainStepDefinition`/`ApprovalChainInstance` + `ApprovalChainService` + admin CRUD API) — `recruitment.HiringRequest`'in GERÇEK 2 aşamalı (yönetici → İK) onay akışı buraya taşındı. Kabul kriterleri: "Motor, mevcut modüllerin davranışını bozmadan devreye alınır (kademeli geçiş)" (US-09.2.1) ve "Sistem yöneticisi olarak, yeni bir onay zincirini kod yazmadan tanımlamak istiyorum" (US-09.2.2). Bu, planın EN YÜKSEK regresyon riskli maddesiydi.
+
+**Tasarım kararları:**
+- **Mevcut 4 tek-adımlı modül (`leave`, `training`, `travel`, `amenities` — `core.approval.ApprovalStatus`/`ApprovalDecisionValidator` üzerinde) DOKUNULMADI** — zaten çalışıyorlar; yalnızca `recruitment.HiringRequest`'in GERÇEK 2 aşamalı akışı motora taşındı (roadmap'in "mevcut modüllerin... bir sonraki benzer ihtiyaç" tetikleyicisine uyan tek gerçek aday).
+- **`HiringRequestService`'in KENDİ ön-doğrulama kontrolleri ve Türkçe hata mesajları ("Bu talep zaten yönetici kararına bağlanmış." vb.) BİLİNÇLİ OLARAK KORUNDU** — motora yalnızca ön-kontroller GEÇTİKTEN SONRA, gerçek durum geçişini kaydetmesi için delege ediliyor. Bu, "dış davranış hiç değişmedi" garantisini sağlıyor; motorun KENDİ savunma amaçlı istisnaları (`"Bu onay zinciri zaten sonuçlanmış."` vb.) normal akışta hiç tetiklenmiyor.
+- **İKİ AŞAMALI KAYIT deseni:** `ApprovalChainInstance.subjectId`, `HiringRequest`'in kendi id'sini tutuyor — ama bu id, zincir örneği kaydedilmeden ÖNCE bilinmiyor (klasik "dairesel id referansı" sorunu). Çözüm: `subjectId` NULLABLE yapıldı, `start()` önce `null` ile kaydediyor, `HiringRequest` GERÇEK id'siyle kaydedildikten SONRA `ApprovalChainService.assignSubject(...)` ile geriye dönük dolduruluyor.
+- **`HiringRequest.approvalChainInstanceId`, diğer modüller-arası `employeeId` gibi FK'siz referanslardan BİLİNÇLİ OLARAK FARKLI** — GERÇEK bir DB FK (`approval_chain_instances(id)`'e) — çünkü `recruitment` artık `platform`'a (`payroll`'un `leave`/`attendance`/`travel`'a olan AYNI tek-yönlü istisna deseniyle) GERÇEK bir Maven bağımlılığıyla bağlı.
+- **US-09.2.2'nin "ekrandan yapılandırılır" kabul kriteri, yalnızca bir REST API (`POST/GET/PUT /api/platform/approval-chains`) olarak karşılandı** — hiçbir modülde henüz bir admin ekranı yok; bu, projenin Bölüm 1-8 boyunca izlediği "önce backend API, ekran sonra" deseniyle tutarlı. Uçlar `hasRole('ADMIN')` ile korunuyor.
+- **`platform`'un İLK controller'ı/`@RestControllerAdvice`'ı** (`ApprovalChainDefinitionController`/`ApprovalExceptionHandler`) — `@Order(HIGHEST_PRECEDENCE)` ilk kez burada uygulandı.
+- **Öğrenilen ders (tekrar):** Flyway seed migration'ı (V65, "hiring-request" zincirini seed ediyor), izole modül testlerinde (Hibernate şema otomatik üretimi kullanıyorlar, Flyway'i DEĞİL) GÖRÜNMÜYOR — `platform`'un KENDİ testleri her testte kendi geçici zincirini oluşturarak, `recruitment`'ın testleri ise `RecruitmentTestApplication`'a eklenen bir `CommandLineRunner` ile "hiring-request"i V65 ile BİREBİR aynı şekilde programatik olarak seed ederek bunu aştı.
+
+**Değişen/eklenen dosyalar:**
+- `platform/src/main/resources/db/migration/V64__create_approval_chain_tables.sql`, `V65__seed_hiring_request_approval_chain.sql` (yeni)
+- `platform/src/main/java/com/digitalik/platform/approval/{ApprovalChainDefinition,ApprovalChainStepDefinition,ApprovalChainInstance,ApprovalChainInstanceStatus}.java` (entity'ler, yeni)
+- `platform/src/main/java/com/digitalik/platform/approval/{*Repository,*NotFoundException}.java` (yeni)
+- `platform/src/main/java/com/digitalik/platform/approval/ApprovalChainService.java` (motor), `ApprovalChainDefinitionService.java` (admin CRUD), `ApprovalChainDefinitionController.java`, `ApprovalExceptionHandler.java` (yeni)
+- `platform/src/main/java/com/digitalik/platform/approval/dto/*.java` (4 DTO, yeni)
+- `platform/src/test/java/com/digitalik/platform/approval/ApprovalChainServiceTest.java` (7 test), `ApprovalChainDefinitionControllerTest.java` (5 test) (yeni)
+- `recruitment/src/main/resources/db/migration/V66__add_approval_chain_instance_id_to_hiring_requests.sql` (yeni)
+- `recruitment/src/main/java/com/digitalik/recruitment/entity/HiringRequest.java` — `approvalChainInstanceId` alanı eklendi
+- `recruitment/src/main/java/com/digitalik/recruitment/service/HiringRequestService.java` — `ApprovalChainService` entegrasyonu
+- `recruitment/src/test/java/com/digitalik/recruitment/RecruitmentTestApplication.java` — "hiring-request" zincirini seed eden `CommandLineRunner`
+- `recruitment/src/test/java/com/digitalik/recruitment/security/HiringRequestAccessGuardTest.java` — güncellenmiş `HiringRequest` constructor çağrıları (davranış DEĞİŞMEDİ)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı; V64/V65/V66 uygulandı ("Successfully applied 66 migrations"), Hibernate `ddl-auto: validate` hatasız. Norm kadro tanımlanıp işe alım talebi oluşturuldu → `approval_chain_instances`'ta `subject_type='HiringRequest', subject_id=1` (İKİ AŞAMALI kayıt deseni doğru çalıştı — `assignSubject` geriye dönük doldurdu), `current_step_order=1, status=IN_PROGRESS`. Yönetici onayladı → API yanıtı `status: MANAGER_APPROVED` (DEĞİŞMEDİ), `psql` ile zincir örneği `current_step_order=2, status=IN_PROGRESS` (motor GERÇEKTEN ilerledi). İK onayladı → API `status: APPROVED`, zincir `status=APPROVED` — İKİ sistem TAM SENKRON. İKİNCİ bir talep oluşturulup yönetici REDDETTİ → API `status: REJECTED`, zincir `status=REJECTED`; AYNI talebe TEKRAR karar verilmeye çalışıldı → 400 "Bu talep zaten yönetici kararına bağlanmış." (ESKİSİYLE BİREBİR AYNI mesaj — dış davranış hiç değişmedi). Admin API: `GET /api/platform/approval-chains` → seed edilen "hiring-request" (2 adım) doğru göründü; `POST` ile YENİ, 3 adımlı bir zincir (`YONETICI→IK→ADMIN`) KOD YAZMADAN, yalnızca REST çağrısıyla tanımlandı (US-09.2.2'nin kabul kriterinin doğrudan kanıtı). Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (30), platform (16), auth (28), organization (76), leave (53), recruitment (40), performance (44), attendance (28), training (22), travel (19), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 465 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

@@ -26,6 +26,15 @@ import jakarta.persistence.Table;
  * DB seviyesinde bir FK İLE değil düz birer {@code Long} olarak tutulur —
  * {@code recruitment} modülü {@code organization}'a bağımlı değildir; bkz.
  * V22 migration'ındaki ({@code staffing_norms}) aynı gerekçe.
+ *
+ * <p>US-09.2.1: {@code approvalChainInstanceId}, {@code
+ * platform.approval.ApprovalChainInstance}'a GERÇEK bir FK ile bağlı
+ * (yukarıdaki FK'siz referanslardan FARKLI — {@code recruitment} artık
+ * {@code platform}'a GERÇEK bir Maven bağımlılığıyla bağlı, {@code
+ * organizationUnitId} gibi güven-sınırı ötesi bir referans değil). Durum
+ * geçişi ({@code status}) HÂLÂ bu sınıfın kendi metotlarıyla yönetiliyor —
+ * zincir örneği, {@code HiringRequestService} tarafından PARALEL olarak
+ * ilerletiliyor (bkz. o sınıfın javadoc'u).
  */
 @Entity
 @Table(name = "hiring_requests")
@@ -41,14 +50,18 @@ public class HiringRequest extends BaseEntity {
     @Column(nullable = false)
     private HiringRequestStatus status;
 
+    @Column(nullable = false)
+    private Long approvalChainInstanceId;
+
     protected HiringRequest() {
         // JPA için
     }
 
-    public HiringRequest(Long organizationUnitId, Long jobTitleId) {
+    public HiringRequest(Long organizationUnitId, Long jobTitleId, Long approvalChainInstanceId) {
         this.organizationUnitId = organizationUnitId;
         this.jobTitleId = jobTitleId;
         this.status = HiringRequestStatus.PENDING;
+        this.approvalChainInstanceId = approvalChainInstanceId;
     }
 
     public void approveByManager() {
@@ -77,5 +90,9 @@ public class HiringRequest extends BaseEntity {
 
     public HiringRequestStatus getStatus() {
         return status;
+    }
+
+    public Long getApprovalChainInstanceId() {
+        return approvalChainInstanceId;
     }
 }

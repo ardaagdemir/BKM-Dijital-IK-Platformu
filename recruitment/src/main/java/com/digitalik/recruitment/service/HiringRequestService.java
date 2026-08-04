@@ -1,5 +1,7 @@
 package com.digitalik.recruitment.service;
 
+import com.digitalik.platform.approval.ApprovalChainInstance;
+import com.digitalik.platform.approval.ApprovalChainService;
 import com.digitalik.recruitment.entity.HiringRequest;
 import com.digitalik.recruitment.entity.HiringRequestStatus;
 import com.digitalik.recruitment.exception.HiringRequestNotFoundException;
@@ -21,17 +23,33 @@ import org.springframework.stereotype.Service;
  * kontrol edilir, burada DEĞİL — bu metotlar yalnızca durum geçişinin
  * kendisinin geçerliliğinden sorumlu (bkz. {@code leave.LeaveRequestService.decide}'daki
  * aynı ayrım).
+ *
+ * <p>US-09.2.1: Bu sınıfın kendi ön-doğrulama kontrolleri ("Bu talep
+ * zaten yönetici kararına bağlanmış." vb.) BİLİNÇLİ OLARAK KORUNDU —
+ * dış davranış/hata mesajları hiç değişmedi (roadmap'in "mevcut modüllerin
+ * davranışını bozmadan devreye alınır" kriteri). Ön-kontroller geçtikten
+ * SONRA, gerçek durum geçişini uygulaması/kaydetmesi için {@link
+ * ApprovalChainService#decide}'a delege ediliyor — motor artık bu iki
+ * aşamalı akışın GERÇEK, PARALEL kayıt tutan tarafı.
  */
 @Service
 public class HiringRequestService {
 
+    private static final String APPROVAL_CHAIN_NAME = "hiring-request";
+    private static final int MANAGER_STEP = 1;
+    private static final int HR_STEP = 2;
+
     private final HiringRequestRepository hiringRequestRepository;
     private final StaffingNormRepository staffingNormRepository;
+    private final ApprovalChainService approvalChainService;
 
     public HiringRequestService(
-            HiringRequestRepository hiringRequestRepository, StaffingNormRepository staffingNormRepository) {
+            HiringRequestRepository hiringRequestRepository,
+            StaffingNormRepository staffingNormRepository,
+            ApprovalChainService approvalChainService) {
         this.hiringRequestRepository = hiringRequestRepository;
         this.staffingNormRepository = staffingNormRepository;
+        this.approvalChainService = approvalChainService;
     }
 
     public HiringRequest create(Long organizationUnitId, Long jobTitleId) {
@@ -45,7 +63,14 @@ public class HiringRequestService {
             throw new StaffingNormNotFoundException();
         }
 
-        return hiringRequestRepository.save(new HiringRequest(organizationUnitId, jobTitleId));
+        // İki aşamalı kayıt: HiringRequest'in kendi id'si, zincir örneği
+        // kaydedilmeden ÖNCE bilinmiyor — bu yüzden subjectId burada null,
+        // HiringRequest kaydedildikten SONRA assignSubject ile dolduruluyor.
+        ApprovalChainInstance chainInstance = approvalChainService.start(APPROVAL_CHAIN_NAME, "HiringRequest", null);
+        HiringRequest hiringRequest =
+                hiringRequestRepository.save(new HiringRequest(organizationUnitId, jobTitleId, chainInstance.getId()));
+        approvalChainService.assignSubject(chainInstance.getId(), hiringRequest.getId());
+        return hiringRequest;
     }
 
     public HiringRequest managerDecide(Long id, boolean approve) {
@@ -53,6 +78,8 @@ public class HiringRequestService {
         if (hiringRequest.getStatus() != HiringRequestStatus.PENDING) {
             throw new IllegalArgumentException("Bu talep zaten yönetici kararına bağlanmış.");
         }
+
+        approvalChainService.decide(hiringRequest.getApprovalChainInstanceId(), MANAGER_STEP, approve);
 
         if (approve) {
             hiringRequest.approveByManager();
@@ -70,6 +97,8 @@ public class HiringRequestService {
         if (hiringRequest.getStatus() != HiringRequestStatus.MANAGER_APPROVED) {
             throw new IllegalArgumentException("Bu talep zaten İK kararına bağlanmış.");
         }
+
+        approvalChainService.decide(hiringRequest.getApprovalChainInstanceId(), HR_STEP, approve);
 
         if (approve) {
             hiringRequest.approveByHr();

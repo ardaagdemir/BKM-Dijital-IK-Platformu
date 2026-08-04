@@ -30,21 +30,21 @@ class HiringRequestAccessGuardTest {
 
     @Test
     void kendiBirimListesindekiTalepIcinTrueDoner() {
-        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L));
+        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L, 1L));
 
         assertThat(hiringRequestAccessGuard.isOwnUnit(request.getId(), List.of(3L, 7L, 9L))).isTrue();
     }
 
     @Test
     void baskaBirimeAitTalepIcinFalseDoner() {
-        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L));
+        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L, 1L));
 
         assertThat(hiringRequestAccessGuard.isOwnUnit(request.getId(), List.of(3L, 9L))).isFalse();
     }
 
     @Test
     void bosVeyaNullListeIcinFalseDoner() {
-        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L));
+        HiringRequest request = hiringRequestRepository.save(new HiringRequest(7L, 1L, 1L));
 
         assertThat(hiringRequestAccessGuard.isOwnUnit(request.getId(), List.of())).isFalse();
         assertThat(hiringRequestAccessGuard.isOwnUnit(request.getId(), null)).isFalse();
