@@ -11,5 +11,7 @@ export const organizationKeys = {
   employees: {
     all: ['organization', 'employees'] as const,
     detail: (id: number) => [...organizationKeys.employees.all, 'detail', id] as const,
+    list: (params: { name?: string; organizationUnitId?: number; jobTitleId?: number; page: number }) =>
+      [...organizationKeys.employees.all, 'list', params] as const,
   },
 }

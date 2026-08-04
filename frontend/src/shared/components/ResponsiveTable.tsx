@@ -26,12 +26,17 @@ type ResponsiveTableProps<T> = {
   rows: T[]
   getRowKey: (row: T) => string | number
   actions?: (row: T) => ReactNode
+  // Bölüm 13.6: "bir satıra tıklayınca detay sayfasına gider" (masaüstü) /
+  // "kart tamamı tıklanabilir" (mobil) — asıl klavye/ekran okuyucu
+  // erişilebilir navigasyonu SAĞLAMAZ (bunun için bir sütun içinde gerçek
+  // bir <Link> render edilmeli); bu yalnızca fare/dokunma KOLAYLIĞI katar.
+  onRowClick?: (row: T) => void
 }
 
 // Bölüm 2.3 / Bölüm 9: masaüstünde tablo, xs/sm'de kart listesi — davranış
 // TEK bu component'te kapsüllenir, her modül kendi tablo/kart geçiş
 // mantığını YENİDEN YAZMAZ.
-export function ResponsiveTable<T>({ columns, rows, getRowKey, actions }: ResponsiveTableProps<T>) {
+export function ResponsiveTable<T>({ columns, rows, getRowKey, actions, onRowClick }: ResponsiveTableProps<T>) {
   const primaryColumn = columns.find((column) => column.primary) ?? columns[0]
   const secondaryColumns = columns.filter((column) => column !== primaryColumn)
 
@@ -49,7 +54,12 @@ export function ResponsiveTable<T>({ columns, rows, getRowKey, actions }: Respon
           </TableHead>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={getRowKey(row)} hover>
+              <TableRow
+                key={getRowKey(row)}
+                hover
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                sx={{ cursor: onRowClick ? 'pointer' : undefined }}
+              >
                 {columns.map((column) => (
                   <TableCell key={column.key}>{column.render(row)}</TableCell>
                 ))}
@@ -68,7 +78,12 @@ export function ResponsiveTable<T>({ columns, rows, getRowKey, actions }: Respon
 
       <Stack spacing={1.5} sx={{ display: { xs: 'flex', md: 'none' } }}>
         {rows.map((row) => (
-          <Card key={getRowKey(row)} variant="outlined">
+          <Card
+            key={getRowKey(row)}
+            variant="outlined"
+            onClick={onRowClick ? () => onRowClick(row) : undefined}
+            sx={{ cursor: onRowClick ? 'pointer' : undefined }}
+          >
             <CardContent>
               {primaryColumn && <Typography variant="subtitle1">{primaryColumn.render(row)}</Typography>}
               {secondaryColumns.map((column) => (

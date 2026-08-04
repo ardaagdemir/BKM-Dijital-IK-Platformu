@@ -186,6 +186,44 @@ npx playwright test  # 54 test (+10 skip), 0 hata
 
 ---
 
-## Genel durum (13.1–13.5 sonrası)
+## 13.6 — Çalışan Listeleme
 
-Toplam: **44 Vitest testi** (unit + entegrasyon), **54 Playwright E2E testi** (+10 viewport-bağımlı skip), tamamı gerçek Docker backend'ine karşı yeşil. `npm run build` ve `npm run lint` her bölüm sonunda temiz. Sıradaki bölüm: **13.6 Çalışan Listeleme**.
+**Özet:** `/organization/employees` — 13.5'te YER TUTUCU olarak bırakılan `EmployeesPlaceholderPage` yerine gerçek, filtrelenebilir, sayfalanmış bir liste. Önce backend'in gerçek `GET /api/organization/employees` (arama: `name`/`organizationUnitId`/`jobTitleId`, `Pageable`, varsayılan `size=20`, `sort=id`) ve `GET /api/organization/employees/export` (`format=csv|xlsx`, CSV `nationalId` alanını BİLİNÇLİ OLARAK dışlıyor) davranışı `EmployeeController`/`EmployeeControllerTest` üzerinden teyit edildi. ÖNEMLİ bulgu: Spring Data'nın bu sürümdeki `Page` JSON şekli DÜZ (`{content, totalElements, ...}`) DEĞİL, İÇ İÇE (`{content:[...], page:{size,number,totalElements,totalPages}}`) — roadmap dokümanının ima ettiğinin AKSİNE, gerçek test assertion'larından doğrulandı.
+
+**Tasarım kararları:**
+- **Filtre state'i URL query string'i ile senkron** (`?name=&organizationUnitId=&jobTitleId=&page=`) — sayfa yenilendiğinde/geri-ileri gidildiğinde kaybolmaz; varsayılan değerler URL'e YAZILMAZ (temiz URL).
+- **İsim araması debounced (400ms)** — her tuş vuruşunda değil, yazma durduktan sonra URL/API tetiklenir; `useDebouncedValue` (yeni, paylaşılan) ilk gerçek ihtiyaçta oluşturuldu.
+- **Birim/Unvan dropdown filtreleri** — `FilterBar`'a geriye-dönük-uyumlu şekilde opsiyonel `selects` prop'u eklendi (var olan 2 çağrı yeri etkilenmedi).
+- **Yetkilendirilmiş dosya indirme** (`apiClient.getBlob` + `URL.createObjectURL` + geçici `<a>` tıklaması) — düz bir `<a href>` Bearer token'ı taşıyamayacağından; CSV/XLSX seçimi bir `Menu` ile sunulur.
+- **`ResponsiveTable`'a `onRowClick`** eklendi (satıra/karta tıklayınca detay sayfasına gider) — mevcut 2 çağrı yeri (`onRowClick` vermeyen) etkilenmedi.
+- **Boş durum İKİ farklı mesaj**: hiç filtre yokken "Henüz çalışan kaydı yok." (Yeni Çalışan CTA'sı ile), filtre uygulanmışken "Bu filtrelere uygun çalışan bulunamadı." (Filtreleri Temizle CTA'sı ile).
+
+**Değişen/eklenen dosyalar:**
+- `frontend/src/shared/api/apiClient.ts` — `performFetch` ortak yardımcıya çıkarıldı; `requestBlob`/`apiClient.getBlob` eklendi
+- `frontend/src/shared/types/PageResponse.ts`, `frontend/src/shared/hooks/useDebouncedValue.ts`, `frontend/src/shared/utils/downloadBlob.ts` (yeni)
+- `frontend/src/shared/components/Pagination.tsx` (yeni) — 0-indexli backend sayfasını 1-indexli MUI `Pagination`'a çevirir
+- `frontend/src/shared/components/FilterBar.tsx` — opsiyonel `selects`/`onClearAll`; `frontend/src/shared/components/ResponsiveTable.tsx` — opsiyonel `onRowClick`
+- `frontend/src/modules/organization/{types,queryKeys}.ts` — `EmployeeSearchParams`, `employees.list` anahtarı
+- `frontend/src/modules/organization/api/organizationApi.ts` — `searchEmployees`, `exportEmployees`; `api/useEmployees.ts` (yeni)
+- `frontend/src/modules/organization/employeeListParams.ts` (yeni, +test) — URL query string ↔ filtre state saf dönüşüm fonksiyonları
+- `frontend/src/modules/organization/pages/EmployeesListPage.tsx` (yeni, +test) — `EmployeesPlaceholderPage.tsx` SİLİNDİ (tamamen yerini aldı)
+- `frontend/src/app/navigation.tsx` — `employees` route'u `EmployeesListPage`'e işaret eder
+- `frontend/test/msw/handlers/organization.ts` — `createOrganizationHandlers`'a opsiyonel 3. parametre (`initialEmployees`) + `GET /employees`, `GET /employees/export` handler'ları (var olan 2 çağrı yeri etkilenmedi)
+- `frontend/test/e2e/employee.spec.ts` — "Çalışan Listeleme (13.6)" bloğu: 13.5 ile zincirlenmiş oluştur→isimle bul senaryosu, filtre daraltma, CSV indirme (`page.waitForEvent('download')`)
+
+**Çalıştırma komutları:**
+```bash
+cd frontend
+npm run test         # 55 test, 0 hata
+npx tsc -b            # temiz
+npm run lint          # temiz (2 önceden var olan, ilgisiz uyarı hariç)
+npx playwright test  # 58 test (+10 skip), 0 hata
+```
+
+**Canlı doğrulama:** Docker backend'e karşı: 13.5'ten zincirlenmiş senaryoda çalışan oluşturulup isimle filtrelenerek listede bulundu; var olmayan bir isimle filtrelenince "Bu filtrelere uygun çalışan bulunamadı." göründü; CSV "Dışa Aktar" butonu gerçek bir `calisanlar.csv` dosyası indirdi (Playwright `download` event'i ile doğrulandı) — tümü masaüstü+mobil × Chromium+WebKit'te (4 proje) yeşil. Not: paylaşılan test veritabanında çalışan sayısı 20'yi (varsayılan sayfa boyutu) aştığında yeni kayıtlar filtresiz ilk sayfada GÖRÜNMEYEBİLİR (id'ye göre sıralı sayfalama, beklenen davranış) — bu yüzden E2E senaryosu doğrudan isim filtresi üzerinden doğrulama yapıyor.
+
+---
+
+## Genel durum (13.1–13.6 sonrası)
+
+Toplam: **55 Vitest testi** (unit + entegrasyon), **58 Playwright E2E testi** (+10 viewport-bağımlı skip), tamamı gerçek Docker backend'ine karşı yeşil. `npm run build` ve `npm run lint` her bölüm sonunda temiz. Sıradaki bölüm: **13.7** (henüz başlanmadı — kullanıcı onayı bekleniyor).

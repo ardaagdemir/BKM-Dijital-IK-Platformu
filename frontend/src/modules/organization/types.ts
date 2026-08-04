@@ -44,3 +44,12 @@ export type CreateEmployeeRequest = {
   hireDate: string
   email: string
 }
+
+// GET /api/organization/employees ve .../export'un ORTAK filtre
+// parametreleri (bkz. organization.EmployeeController#search/#export) —
+// name kısmi/büyük-küçük harf duyarsız eşleşir (backend LIKE sorgusu).
+export type EmployeeSearchParams = {
+  name?: string
+  organizationUnitId?: number
+  jobTitleId?: number
+}

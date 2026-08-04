@@ -5,7 +5,7 @@ import { Navigate, type RouteObject } from 'react-router-dom'
 import { ProtectedRoute } from '../modules/auth/ProtectedRoute'
 import { EmployeeCreatePage } from '../modules/organization/pages/EmployeeCreatePage'
 import { EmployeeDetailPage } from '../modules/organization/pages/EmployeeDetailPage'
-import { EmployeesPlaceholderPage } from '../modules/organization/pages/EmployeesPlaceholderPage'
+import { EmployeesListPage } from '../modules/organization/pages/EmployeesListPage'
 import { JobTitlesPage } from '../modules/organization/pages/JobTitlesPage'
 import { OrganizationLayout } from '../modules/organization/pages/OrganizationLayout'
 import { UnitsPage } from '../modules/organization/pages/UnitsPage'
@@ -62,9 +62,9 @@ export const appRoutes: AppRoute[] = [
       { index: true, element: <Navigate to="units" replace /> },
       { path: 'units', element: <UnitsPage />, handle: { title: 'Organizasyon Birimleri' } },
       { path: 'job-titles', element: <JobTitlesPage />, handle: { title: 'Unvanlar' } },
-      // Bölüm 13.5: yalnızca oluşturma + minimal detay; tam liste (13.6) ve
-      // tam düzenleme/atama sekmeleri (13.7) SONRAKİ bölümler.
-      { path: 'employees', element: <EmployeesPlaceholderPage />, handle: { title: 'Çalışanlar' } },
+      // Bölüm 13.6: filtrelenebilir/sayfalanmış liste. Tam düzenleme/atama
+      // sekmeleri (13.7) SONRAKİ bölüm.
+      { path: 'employees', element: <EmployeesListPage />, handle: { title: 'Çalışanlar' } },
       { path: 'employees/new', element: <EmployeeCreatePage />, handle: { title: 'Yeni Çalışan' } },
       { path: 'employees/:id', element: <EmployeeDetailPage />, handle: { title: 'Çalışan Detayı' } },
     ],

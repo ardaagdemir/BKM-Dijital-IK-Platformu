@@ -30,7 +30,11 @@ async function parseProblem(response: Response): Promise<ProblemDetail | null> {
   }
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+// Bölüm 6.1'in "her istekte Authorization otomatik eklenir" + Bölüm 5.2'nin
+// "login hariç herhangi bir 401 global oturum temizler" davranışını TEK bir
+// yerde kapsüller — hem JSON hem blob (dosya indirme) yanıtları AYNI fetch
+// çağrısını paylaşır, yalnızca gövde ayrıştırması farklıdır.
+async function performFetch(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = {}
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json'
@@ -46,8 +50,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
 
-  // Bölüm 5.2: login isteğinin KENDİSİ hariç, herhangi bir 401 global oturum
-  // temizleme + /login'e yönlendirme tetikler (TTL dolumu dahil).
   if (response.status === 401 && path !== LOGIN_PATH) {
     clearToken()
     if (!window.location.pathname.startsWith('/login')) {
@@ -55,6 +57,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     }
     throw new ApiError(401, 'Oturum sona erdi', 'Oturumunuz sona erdi, tekrar giriş yapın.')
   }
+
+  return response
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await performFetch(path, options)
 
   if (response.status === 204) {
     return undefined as T
@@ -72,9 +80,29 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   return (await response.json()) as T
 }
 
+// Bölüm 13.6: CSV/XLSX dışa aktarma — indirme, tarayıcının kendi `<a href>`
+// mekanizmasıyla YAPILAMAZ (Authorization header'ı taşıyamaz); dosya
+// `Blob` olarak alınıp `shared/utils/downloadBlob` ile istemci tarafında
+// indirilir.
+async function requestBlob(path: string): Promise<Blob> {
+  const response = await performFetch(path, { method: 'GET' })
+
+  if (!response.ok) {
+    const problem = await parseProblem(response)
+    throw new ApiError(
+      response.status,
+      problem?.title ?? 'Hata',
+      problem?.detail ?? 'Beklenmeyen bir hata oluştu, tekrar deneyin.',
+    )
+  }
+
+  return response.blob()
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  getBlob: (path: string) => requestBlob(path),
 }

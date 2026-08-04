@@ -1,12 +1,28 @@
 import { apiClient } from '../../../shared/api/apiClient'
+import type { PageResponse } from '../../../shared/types/PageResponse'
 import type {
   CreateEmployeeRequest,
   CreateOrganizationUnitRequest,
   Employee,
+  EmployeeSearchParams,
   JobTitle,
   JobTitleRequest,
   OrganizationUnit,
 } from '../types'
+
+function buildEmployeeQuery(params: EmployeeSearchParams): URLSearchParams {
+  const query = new URLSearchParams()
+  if (params.name) {
+    query.set('name', params.name)
+  }
+  if (params.organizationUnitId) {
+    query.set('organizationUnitId', String(params.organizationUnitId))
+  }
+  if (params.jobTitleId) {
+    query.set('jobTitleId', String(params.jobTitleId))
+  }
+  return query
+}
 
 export function listUnits(): Promise<OrganizationUnit[]> {
   return apiClient.get<OrganizationUnit[]>('/api/organization/units')
@@ -38,4 +54,21 @@ export function createEmployee(request: CreateEmployeeRequest): Promise<Employee
 
 export function getEmployee(id: number): Promise<Employee> {
   return apiClient.get<Employee>(`/api/organization/employees/${id}`)
+}
+
+export function searchEmployees(
+  params: EmployeeSearchParams & { page: number; size?: number },
+): Promise<PageResponse<Employee>> {
+  const query = buildEmployeeQuery(params)
+  query.set('page', String(params.page))
+  query.set('size', String(params.size ?? 20))
+  return apiClient.get<PageResponse<Employee>>(`/api/organization/employees?${query.toString()}`)
+}
+
+export function exportEmployees(
+  params: EmployeeSearchParams & { format: 'csv' | 'xlsx' },
+): Promise<Blob> {
+  const query = buildEmployeeQuery(params)
+  query.set('format', params.format)
+  return apiClient.getBlob(`/api/organization/employees/export?${query.toString()}`)
 }
