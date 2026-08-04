@@ -3197,3 +3197,27 @@ docker compose down
 Plandaki 10 maddenin (C, D, I, platform modülü iskeleti, F, G, B, E, H, A, J) TAMAMI bitti — Bölüm 9, kullanıcının "gerçek kurumsal servis/satın alma gerektirenleri atla, mimariyi güçlendiren her şeyi yap" talimatı doğrultusunda tamamlandı. Kapsam dışı bırakılanlar (roadmap gerekçesiyle veya kullanıcı onayıyla): US-09.1.1 (AD/LDAP), US-09.1.2 (SSO/OIDC/SAML), US-09.6.1 (audit immutability), US-09.6.2 (merkezi log sistemi), US-09.8.2 (SGK/e-Devlet), US-09.8.3 (eski bordro taşıma), US-09.9.2 (CI SAST/SCA). US-09.10.1 (Docker imajı) zaten tamamlanmıştı.
 
 Her madde ayrı commit'le, `mvn test` (modül + tam reactor) ve canlı Docker doğrulamasıyla teslim edildi — toplamda platform modülü sıfırdan açıldı (14→15 modül), 4 modül (`organization`, `recruitment`, `travel`, `payroll`) ona veya birbirine yeni tek-yönlü Maven bağımlılıkları kazandı, ve roadmap'in geri kalan bölümlerinde (1-8) tekrarlanan gerçek ihtiyaçlar (bildirim, dışa aktarma, dosya saklama, onay akışı) genelleştirildi.
+
+---
+
+## Proje yapısı — backend `backend/` altına taşındı
+
+**Özet:** Bir User Story değil, yapısal bir düzenleme: tüm Maven modülleri (`core`, `platform`, `auth`, `organization`, `leave`, `recruitment`, `performance`, `attendance`, `training`, `travel`, `discipline`, `feedback`, `amenities`, `payroll`, `bootstrap`) + kök `pom.xml` + `Dockerfile` + `.dockerignore`, repo köküne dağılmış haldeyken `backend/` altına taşındı — `frontend/`'in zaten sahip olduğu izolasyonun AYNISI backend için de kuruldu (kullanıcı isteği: "proje çok dağınık gözüküyor, backend'i de frontend gibi kendi klasöründe yapabilir miyiz").
+
+**Değişen/eklenen dosyalar:**
+- 15 Maven modülü + `pom.xml` + `Dockerfile` + `.dockerignore` → `git mv` ile `backend/` altına taşındı (geçmiş korunarak)
+- `docker-compose.yml` — `backend.build.context: .` → `./backend`
+- `backend/Dockerfile` — İÇERİK DEĞİŞMEDİ (COPY yolları zaten build context'e göre relative, context modülle birlikte taşındığından ayrı bir düzeltme GEREKMEDİ)
+- `backend/.dockerignore` — artık yalnızca `backend/` bağlamına ait olduğundan sadeleştirildi (`frontend/`, `docs/`, `.claude/`, `.git/` satırları kaldırıldı — bunlar zaten yeni build context'in DIŞINDA)
+- Kök `.gitignore` — değişiklik GEREKMEDİ (`target/` gibi desenler baştan `/` olmadığından her derinlikte eşleşiyor)
+
+**Canlı doğrulama:** `mvn clean` (eski `target/` dizinleri temizlendi) → `backend/`'den `mvn test` → **tüm 15 modül + aggregator BUILD SUCCESS, sıfır regresyon**. `docker compose build backend` (yeni context `./backend`) → aynı image hash'i üretti (içerik byte-birebir taşındığının kanıtı, layer cache tam isabet). `docker compose up -d` → tüm servisler (postgres, backend, frontend, mailpit, clamav, postgres-backup) sağlıklı ayağa kalktı; `curl` ile `POST /api/auth/login` → 200, `GET http://localhost:3000/` → 200. Frontend'in tam Playwright E2E paketi (`npx playwright test`, 64 test) yeniden konumlandırılmış backend container'ına karşı çalıştırıldı → **54 geçti, 10 viewport-bağımlı skip, 0 hata**. Sonra `docker compose down`.
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn test    # tam reactor
+docker compose build backend   # repo kökünden
+docker compose up -d
+docker compose down
+```
