@@ -19,6 +19,30 @@ services:
       timeout: 5s
       retries: 10
 
+  # US-09.10.2: Zamanlanmış veritabanı yedeği — ücretsiz/açık kaynak, self-hosted,
+  # bu iş için özel yapılmış bir imaj (sıfırdan script yazmak yerine). Varsayılan
+  # olarak her gün 02:00'de (SCHEDULE) plain SQL dump alır, yerel bir Docker
+  # volume'a (postgres_backups, "postgres" servisininkinden AYRI) yazar; retention
+  # BACKUP_KEEP_* ile yönetilir. Bulut depolama/ücretli bir servis YOK. Manuel bir
+  # yedek/geri yükleme için (ör. canlı doğrulama): `docker exec <konteyner>
+  # /backup.sh` / `/restore.sh <dosya>` — imajın kendi sağladığı script'ler.
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: dijitalik
+      POSTGRES_USER: dijitalik
+      POSTGRES_PASSWORD: dijitalik
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # US-04.3.1: Yerel geliştirme/test için SMTP yakalayıcı (gerçek e-posta göndermez,
   # web arayüzü + REST API üzerinden gelen postaları gösterir). Üretimde MAIL_HOST/
   # MAIL_PORT/MAIL_FROM_ADDRESS ortam değişkenleri gerçek bir SMTP sağlayıcısına
@@ -79,3 +103,4 @@ services:
 
 volumes:
   postgres_data:
+  postgres_backups:

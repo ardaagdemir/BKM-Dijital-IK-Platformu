@@ -3156,8 +3156,44 @@ docker compose down
 
 ---
 
-## Bölüm 9 — Ara durum notu (checkpoint #2)
+## US-09.10.2 — Zamanlanmış veritabanı yedeği
 
-9/10 madde tamamlandı: **C, D, I, platform iskeleti, F, G, B, E, H, A**. Kalan tek madde: **J — US-09.10.2** (zamanlanmış veritabanı yedeği, `prodrigestivill/postgres-backup-local` Docker servisi + canlı al→sıfırla→geri-yükle doğrulaması) — planın son maddesi, tamamen bağımsız. Kapsam dışı bırakılanlar değişmedi (bkz. yukarıdaki checkpoint #1).
+**Özet:** `docker-compose.yml`'e yeni `postgres-backup` servisi (`prodrigestivill/postgres-backup-local:16-alpine`) — kabul kriteri: "Sistem, veritabanının düzenli aralıklarla yedeklenmesini sağlar." Sıfırdan script yazmak yerine bu iş için özel yapılmış, ücretsiz/açık kaynak, self-hosted bir Docker imajı kullanıldı — bulut depolama/ücretli bir servis YOK.
 
-Sıradaki adım: **J** (zamanlanmış veritabanı yedeği) — Bölüm 9'un SON maddesi.
+**Tasarım kararları:**
+- **`SCHEDULE: "@daily"`** — go-cron formatı, her gün 02:00 UTC'de otomatik yedek alır; `BACKUP_KEEP_DAYS=7`/`WEEKS=4`/`MONTHS=6` ile basit bir retention politikası (imajın kendi go-cron zamanlayıcısı, ek bir cron kurulumu GEREKMİYOR).
+- **`postgres_backups`, `postgres_data`'dan AYRI bir Docker volume** — yedekler, üzerine yazıldığı asıl veri diskinden fiziksel olarak bağımsız (aynı diskin bozulması ikisini birden götürmesin diye bilinçli ayrım — gerçek bir üretim ortamında bu ayrıca uzak bir depolamaya senkronize edilir, ama bu proje kapsamında yerel bir volume yeterli).
+- **`depends_on: postgres (service_healthy)`** — `mailpit`/`clamav`'daki `service_started` deseninden BİLİNÇLİ OLARAK farklı: yedekleme servisinin `pg_dump` çalıştırabilmesi için Postgres'in GERÇEKTEN hazır (yalnızca başlamış değil) olması gerekiyor.
+- **Manuel tetikleme, imajın KENDİ script'leriyle** (`/backup.sh`, `/restore.sh`) — projeye özel bir yedekleme/geri yükleme kodu YAZILMADI, kanıtlanmış, bakımlı bir araç kullanıldı (canlı doğrulamada ikisi de gerçekten çalıştırıldı, aşağıya bkz.).
+
+**Değişen dosyalar:**
+- `docker-compose.yml` — `postgres-backup` servisi + `postgres_backups` volume'ü (yeni)
+
+**Canlı doğrulama (bu projenin köklü "her story Docker'da canlı doğrulanır" disiplinine uygun, GERÇEK bir yedek al→sıfırla→geri yükle döngüsü):**
+1. `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE tamamlandı; `postgres-backup` konteyneri "new cron: @daily" ile başladı.
+2. Bir çalışan oluşturuldu (`id=1`, "Yedek Testi").
+3. `docker exec ... /backup.sh` → "SQL backup created successfully"; `/backups/last/dijitalik-latest.sql.gz` dosyası GERÇEKTEN oluştu (13867 bayt).
+4. **Gerçek veri kaybı simülasyonu:** `dijitalik` veritabanı `psql` ile DOĞRUDAN `DROP DATABASE` + boş `CREATE DATABASE` edildi (yalnızca bir tablo silmek değil, TÜM şemanın kaybı) — `\dt` ile "Did not find any relations" doğrulandı (gerçekten boş).
+5. **Geri yükleme:** `gunzip -c .../dijitalik-latest.sql.gz | psql -h postgres -U dijitalik -d dijitalik` → tüm tablolar/veri yeniden oluşturuldu.
+6. **Kanıt:** `psql` ile DOĞRUDAN `SELECT * FROM employees` → `id=1, "Yedek Testi"` GERİ GELDİ; AYRICA yedekten ÖNCE alınmış bir oturum token'ıyla `GET /api/organization/employees/1` → 200, AYNI çalışan verisi (backend'in kendisi HİÇBİR ŞEY yeniden oluşturmadı — `sessions` tablosu da dahil TÜM veri yedekten geldi, oturum token'ı bile hâlâ geçerliydi).
+7. Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+docker compose down -v
+docker compose up --build -d
+docker exec bkm-dijital-ik-platformu-postgres-backup-1 /backup.sh
+docker exec bkm-dijital-ik-platformu-postgres-1 psql -U dijitalik -d postgres -c "DROP DATABASE dijitalik;"
+docker exec bkm-dijital-ik-platformu-postgres-1 psql -U dijitalik -d postgres -c "CREATE DATABASE dijitalik OWNER dijitalik;"
+docker exec bkm-dijital-ik-platformu-postgres-backup-1 sh -c \
+  "gunzip -c /backups/last/dijitalik-latest.sql.gz | PGPASSWORD=dijitalik psql -h postgres -U dijitalik -d dijitalik"
+docker compose down
+```
+
+---
+
+## Bölüm 9 tamamlandı — Kurumsal Entegrasyonlar ve Altyapı
+
+Plandaki 10 maddenin (C, D, I, platform modülü iskeleti, F, G, B, E, H, A, J) TAMAMI bitti — Bölüm 9, kullanıcının "gerçek kurumsal servis/satın alma gerektirenleri atla, mimariyi güçlendiren her şeyi yap" talimatı doğrultusunda tamamlandı. Kapsam dışı bırakılanlar (roadmap gerekçesiyle veya kullanıcı onayıyla): US-09.1.1 (AD/LDAP), US-09.1.2 (SSO/OIDC/SAML), US-09.6.1 (audit immutability), US-09.6.2 (merkezi log sistemi), US-09.8.2 (SGK/e-Devlet), US-09.8.3 (eski bordro taşıma), US-09.9.2 (CI SAST/SCA). US-09.10.1 (Docker imajı) zaten tamamlanmıştı.
+
+Her madde ayrı commit'le, `mvn test` (modül + tam reactor) ve canlı Docker doğrulamasıyla teslim edildi — toplamda platform modülü sıfırdan açıldı (14→15 modül), 4 modül (`organization`, `recruitment`, `travel`, `payroll`) ona veya birbirine yeni tek-yönlü Maven bağımlılıkları kazandı, ve roadmap'in geri kalan bölümlerinde (1-8) tekrarlanan gerçek ihtiyaçlar (bildirim, dışa aktarma, dosya saklama, onay akışı) genelleştirildi.
