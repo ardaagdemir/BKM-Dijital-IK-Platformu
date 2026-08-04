@@ -13,6 +13,7 @@ import com.digitalik.organization.dto.CreateEmployeeRequest;
 import com.digitalik.organization.dto.CreateOrganizationUnitRequest;
 import com.digitalik.organization.dto.EmployeeProfileRequest;
 import com.digitalik.organization.dto.JobTitleRequest;
+import com.digitalik.organization.dto.UpdateIbanRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -447,6 +448,32 @@ class EmployeeControllerTest {
                 .andExpect(header().string(
                         "Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"calisanlar.xlsx\""));
+    }
+
+    /** US-09.8.1: {@code TR330006100519786457841326}, {@code core.IbanValidatorTest}'teki AYNI geçerli örnek IBAN. */
+    @Test
+    void gecerliIbanGuncellenirVeGeriOkunur() throws Exception {
+        Long employeeId = calisanOlustur("Ahmet", "Yılmaz", GECERLI_TC_NO);
+
+        mockMvc.perform(put("/api/organization/employees/" + employeeId + "/iban")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateIbanRequest("TR330006100519786457841326"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.iban").value("TR330006100519786457841326"));
+
+        mockMvc.perform(get("/api/organization/employees/" + employeeId))
+                .andExpect(jsonPath("$.iban").value("TR330006100519786457841326"));
+    }
+
+    @Test
+    void gecersizIbanReddedilirVe400Doner() throws Exception {
+        Long employeeId = calisanOlustur("Ahmet", "Yılmaz", GECERLI_TC_NO);
+
+        mockMvc.perform(put("/api/organization/employees/" + employeeId + "/iban")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateIbanRequest("TR340006100519786457841326"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("IBAN geçersiz."));
     }
 
     private Long calisanOlustur() throws Exception {

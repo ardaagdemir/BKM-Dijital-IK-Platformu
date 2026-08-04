@@ -13,10 +13,10 @@
     <artifactId>payroll</artifactId>
     <name>payroll</name>
     <description>Bordro ve Bordroya Hazırlık modülü (roadmap Bölüm 8, EPIC-08D). core'a ek olarak
-        leave/attendance/travel'a da bağımlıdır (bkz. US-08D.1.2'deki bilinçli, kullanıcıyla
-        birlikte kararlaştırılan mimari istisna — bu modül roadmap'in kendi tanımıyla "onaylanmış
-        veriyi okuyan bir tüketici"; bağımlılık TEK YÖNLÜ, yalnızca payroll bağımlı olur, tersi
-        değil).</description>
+        leave/attendance/travel'a (bkz. US-08D.1.2) ve organization'a (bkz. US-09.8.1) da
+        bağımlıdır — her ikisi de AYNI, kullanıcıyla birlikte kararlaştırılan mimari istisna:
+        bu modül roadmap'in kendi tanımıyla "onaylanmış veriyi okuyan bir tüketici"; bağımlılık
+        TEK YÖNLÜ, yalnızca payroll bağımlı olur, tersi değil.</description>
 
     <dependencies>
         <dependency>
@@ -43,6 +43,13 @@
         <dependency>
             <groupId>com.bkm</groupId>
             <artifactId>travel</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- US-09.8.1: Banka ödeme dosyası için çalışanın IBAN'ını ve güncel ücretini okumak için. -->
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>organization</artifactId>
             <version>${project.version}</version>
         </dependency>
 

@@ -3028,7 +3028,7 @@ docker compose down
 
 Aşağıdaki liste, `zesty-sleeping-reef` planındaki 10 maddenin şu ana kadarki durumunu özetliyor — her tamamlanan madde için ayrıntılı gerekçe/dosya listesi zaten kendi başlığı altında yukarıda mevcut; bu not yalnızca üst düzey bir ilerleme fotoğrafı.
 
-**Tamamlanan (8/10):**
+**Tamamlanan (9/10):**
 1. ✅ **C — US-09.3.1** Merkezi bildirim/şablon servisi (`core.notification`, commit `83e96f3`)
 2. ✅ **D — US-09.4.1** Merkezi CSV/Excel dışa aktarma bileşeni (`core.export`, commit `0564c8c`)
 3. ✅ **I — US-09.9.1** Hassas alanların şifrelenmesi — TC No + ücret (`core.security.Encrypted*Converter`, commit `7dc226d`)
@@ -3037,9 +3037,9 @@ Aşağıdaki liste, `zesty-sleeping-reef` planındaki 10 maddenin şu ana kadark
 6. ✅ **G — US-09.7.2** ClamAV virüs tarama (3 yükleme noktasının tamamı, commit `96b51fc`)
 7. ✅ **B — US-09.2.1/US-09.2.2** Onay zinciri motoru + `recruitment.HiringRequest` migrasyonu (commit `70f7817`)
 8. ✅ **E — US-09.5.1** Dinamik/parametrik özel alan çerçevesi (`platform.customfield`, `organization.Employee` üzerinde kanıtlandı)
+9. ✅ **H — US-09.8.1** Banka ödeme dosyası (`payroll.BankPaymentFileService`, `Employee.iban` + mod-97 `core.validation.IbanValidator`, `payroll`→`organization` yeni bağımlılık)
 
-**Kalan (3/10, plandaki sıraya göre):**
-9. ⏳ **H — US-09.8.1** Banka ödeme dosyası — `EmployeeSalaryRecord.iban` alanı, mod-97 `core.validation.IbanValidator`, `payroll`→`organization` yeni tek-yönlü bağımlılık, `core.export.CsvExporter` ile CSV üretimi. I tamamlandığı için önü açık.
+**Kalan (2/10, plandaki sıraya göre):**
 10. ⏳ **A — US-09.1.3** TOTP tabanlı MFA — mevcut e-posta step-up akışına ALTERNATİF (silinmiyor), `dev.samstevens.totp` kütüphanesi, sır `auth.User`'da. Bağımsız/izole, herhangi bir sırada yapılabilir.
 11. ⏳ **J — US-09.10.2** Zamanlanmış veritabanı yedeği — `prodrigestivill/postgres-backup-local` Docker servisi + canlı al→sıfırla→geri-yükle doğrulaması. Tamamen bağımsız, planın son maddesi.
 
@@ -3079,4 +3079,43 @@ docker compose up --build -d
 docker compose down
 ```
 
-Sıradaki adım: **H** (banka ödeme dosyası).
+---
+
+## US-09.8.1 — Banka ödeme dosyası
+
+**Özet:** `payroll.BankPaymentFileService` — kabul kriteri: "Sistem, onaylanmış bordro verisinden banka ödeme dosyası üretir." `GET /api/payroll/bank-payment-file?year=&month=`, her çalışanın IBAN'ı ve o dönemde geçerli ücretiyle `calisan_id,iban,tutar,aciklama` sütunlu bir CSV üretir. Gerçek bir banka XML standardı (ISO 20022 vb.) YOK — `PayrollExportService`'teki AYNI "basit CSV" hassasiyeti korundu.
+
+**Tasarım kararları:**
+- **`iban`, `organization.EmployeeSalaryRecord`'a DEĞİL `organization.Employee`'ye eklendi** — plandaki ilk taslağın aksine: IBAN, çalışanın GÜNCEL/tekil banka hesabıdır, `EmployeeSalaryRecord`'un salt-ekleme/değişmez (append-only/immutable) geçmiş semantiğine (bkz. o entity'nin javadoc'u) uymaz; bir banka hesabı değişikliğini "yeni bir ücret olayı" gibi modellemek yanlış olurdu. Ayrı bir uç (`PUT /{id}/iban`), temel bilgi güncellemesinden (`PUT /{id}`) BİLİNÇLİ OLARAK AYRI tutuldu — banka hesabı değişikliği ile ad/TC No güncellemesi ayrı kaygılar.
+- **`iban`, US-09.9.1'in ÖNCEDEN VERDİĞİ SÖZE sadık kalınarak ANINDA şifrelendi** (`EncryptedStringConverter`) — o story'nin log girdisi "roadmap'in üçü de istediği TC No/IBAN/ücret" diyordu; IBAN alanı o an henüz yoktu, burada eklenirken şifrelemesi de birlikte geldi.
+- **`core.validation.IbanValidator`** — ISO 13616 mod-97 kontrol basamağı, saf algoritma (harici SWIFT/banka çağrısı YOK) — `BigInteger` ile hesaplanıyor (26+ haneli sayılar `long`'a sığmaz). `core.approval.ApprovalStatus`'la AYNI gerekçeyle `core`'da (iş mantığı içermeyen genel amaçlı yardımcı).
+- **`payroll`, `organization`'a YENİ tek-yönlü bağımlılık kazandı** — `leave`/`attendance`/`travel`'a olan mevcut istisnanın (US-08D.1.2) AYNI, kullanıcıyla önceden kararlaştırılan deseni; `payroll/pom.xml`'in açıklaması bunu yansıtacak şekilde güncellendi.
+- **Her çalışan için, dönemin SON gününe kadar yürürlüğe girmiş EN SON `EmployeeSalaryRecord` kullanılır** (`effectiveDate <= YearMonth.atEndOfMonth()`) — "o dönemde geçerli olan ücret" semantiği; sonraki bir zam/ücret değişikliği yanlışlıkla geçmiş bir döneme sızmaz (canlıda doğrulandı — bkz. aşağıda).
+- **IBAN'ı OLMAYAN veya o döneme kadar hiç ücret kaydı OLMAYAN çalışanlar dosyaya DAHİL EDİLMEZ** (sessizce atlanır, hata FIRLATILMAZ) — ödenecek bir hesap/tutar yoksa satır üretmenin anlamı yok; roadmap'in "basit CSV" felsefesiyle tutarlı.
+- **`/api/payroll/bank-payment-file`, `auth.PayrollStepUpFilter`'ın (US-08D.1.4) 2FA gereksinimine EK KOD OLMADAN otomatik dahil oldu** — filtre `/api/payroll/**` önekini sabit kodluyor; canlıda doğrulandı (aşağıya bkz.).
+- **Rol kısıtlaması eklenmedi** — `PayrollConsolidationController`'daki AYNI gerekçe (kabul kriteri bundan bahsetmiyor).
+
+**Değişen/eklenen dosyalar:**
+- `core/src/main/java/com/digitalik/core/validation/IbanValidator.java` (yeni); `core/src/test/java/com/digitalik/core/validation/IbanValidatorTest.java` (5 test)
+- `organization/src/main/resources/db/migration/V68__add_iban_to_employees.sql` (yeni)
+- `organization/src/main/java/com/digitalik/organization/entity/Employee.java` — `iban` alanı (`@Convert(EncryptedStringConverter)`), `updateIban`
+- `organization/src/main/java/com/digitalik/organization/service/EmployeeService.java` — `updateIban(id, iban)`
+- `organization/src/main/java/com/digitalik/organization/dto/UpdateIbanRequest.java` (yeni); `EmployeeResponse.java` — `iban` alanı eklendi
+- `organization/src/main/java/com/digitalik/organization/controller/EmployeeController.java` — `PUT /{id}/iban`
+- `organization/src/test/java/com/digitalik/organization/controller/EmployeeControllerTest.java` — 2 yeni test
+- `payroll/pom.xml` — `organization` bağımlılığı; `payroll/src/test/java/com/digitalik/payroll/PayrollTestApplication.java` — tarama kapsamına `com.digitalik.organization` eklendi
+- `payroll/src/main/java/com/digitalik/payroll/service/BankPaymentFileService.java`, `controller/BankPaymentFileController.java` (yeni)
+- `payroll/src/test/java/com/digitalik/payroll/controller/BankPaymentFileControllerTest.java` (3 test, yeni)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE tamamlandı; V68 uygulandı ("Successfully applied 68 migrations"). **2FA entegrasyonu:** step-up doğrulanmamış bir oturumla `GET /api/payroll/bank-payment-file` → 403 "Bu modüle erişim için ek doğrulama (2FA) gereklidir." (US-08D.1.4'ün filtresi hiçbir yeni kod olmadan otomatik uygulandı); mailpit üzerinden kod alınıp `POST /api/auth/payroll-access/verify` ile doğrulandıktan SONRA aynı uç → 200. Çalışan oluşturulup IBAN atandı, ücret kaydı eklendi (42000.00) → `GET .../bank-payment-file?year=2026&month=1` → `1,TR330006100519786457841326,42000.00,2026-01 bordro ödemesi` doğru satırı üretti. Geçersiz kontrol basamaklı bir IBAN (`TR000000000000000000000000`) ile `PUT .../iban` → 400 "IBAN geçersiz." **Şifreleme doğrulaması:** `psql` ile DOĞRUDAN `employees.iban` sorgulandığında Base64 şifreli metin (`WnQGX8jQH7WnfkK55IafBFC5lpHaWDsBgESQVKWTROwl2maPlkfh0+W+OHeKLLQ91+AeoJKw`) görüldü — düz metin DEĞİL. Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn -pl core,organization,payroll -am test
+mvn test   # tam reactor, BUILD SUCCESS, sıfır regresyon
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```
+
+Sıradaki adım: **A** (TOTP tabanlı MFA).

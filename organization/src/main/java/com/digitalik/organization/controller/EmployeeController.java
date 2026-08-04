@@ -5,6 +5,7 @@ import com.digitalik.organization.dto.CreateEmployeeRequest;
 import com.digitalik.organization.dto.EmployeeProfileRequest;
 import com.digitalik.organization.dto.EmployeeProfileResponse;
 import com.digitalik.organization.dto.EmployeeResponse;
+import com.digitalik.organization.dto.UpdateIbanRequest;
 import com.digitalik.organization.entity.Employee;
 import com.digitalik.organization.entity.EmployeeProfile;
 import com.digitalik.organization.service.EmployeeExportService;
@@ -90,6 +91,12 @@ public class EmployeeController {
         return toResponse(employee);
     }
 
+    /** US-09.8.1: {@code payroll.BankPaymentFileService}'in ihtiyaç duyduğu IBAN'ı yönetir. */
+    @PutMapping("/{id}/iban")
+    public EmployeeResponse updateIban(@PathVariable Long id, @RequestBody UpdateIbanRequest request) {
+        return toResponse(employeeService.updateIban(id, request.iban()));
+    }
+
     @GetMapping
     public Page<EmployeeResponse> search(
             @RequestParam(required = false) String name,
@@ -154,7 +161,8 @@ public class EmployeeController {
                 employee.getHireDate(),
                 employee.getEmail(),
                 employee.getOrganizationUnitId(),
-                employee.getJobTitleId());
+                employee.getJobTitleId(),
+                employee.getIban());
     }
 
     private static EmployeeProfileResponse toProfileResponse(EmployeeProfile profile) {

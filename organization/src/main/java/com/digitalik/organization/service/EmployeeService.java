@@ -1,5 +1,6 @@
 package com.digitalik.organization.service;
 
+import com.digitalik.core.validation.IbanValidator;
 import com.digitalik.organization.entity.Employee;
 import com.digitalik.organization.entity.EmployeeAssignmentHistory;
 import com.digitalik.organization.exception.DuplicateNationalIdException;
@@ -121,6 +122,21 @@ public class EmployeeService {
                 new EmployeeAssignmentHistory(employeeId, organizationUnitId, jobTitleId, today));
 
         employee.assign(organizationUnitId, jobTitleId);
+        return employeeRepository.save(employee);
+    }
+
+    /**
+     * US-09.8.1: IBAN, temel bilgi güncellemesinden ({@link #update}) AYRI
+     * bir uçla yönetiliyor — banka hesabı değişikliği ile ad/TC No/işe
+     * giriş tarihi güncellemesi ayrı kaygılar.
+     */
+    public Employee updateIban(Long id, String iban) {
+        Employee employee = employeeRepository.findById(id).orElseThrow(EmployeeNotFoundException::new);
+        if (!IbanValidator.isValid(iban)) {
+            throw new IllegalArgumentException("IBAN geçersiz.");
+        }
+
+        employee.updateIban(iban);
         return employeeRepository.save(employee);
     }
 

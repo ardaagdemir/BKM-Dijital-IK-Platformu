@@ -56,6 +56,17 @@ public class Employee extends BaseEntity {
     @Column
     private Long jobTitleId;
 
+    /**
+     * US-09.8.1: Banka ödeme dosyası üretimi için — {@code
+     * payroll.BankPaymentFileService} tarafından okunur. US-09.9.1'in
+     * "roadmap'in üçü de istediği TC No/IBAN/ücret" listesine sadık
+     * kalınarak şifrelendi (bkz. {@link EncryptedStringConverter}'ın AYNI
+     * javadoc'u — deterministik AES-GCM).
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column
+    private String iban;
+
     protected Employee() {
         // JPA için
     }
@@ -108,5 +119,13 @@ public class Employee extends BaseEntity {
 
     public Long getJobTitleId() {
         return jobTitleId;
+    }
+
+    public String getIban() {
+        return iban;
+    }
+
+    public void updateIban(String iban) {
+        this.iban = iban;
     }
 }

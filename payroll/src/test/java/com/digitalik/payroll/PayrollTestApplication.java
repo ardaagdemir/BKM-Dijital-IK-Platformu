@@ -23,6 +23,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * travel.ExpenseItemService} artık {@code platform.file.FileStorageService}'e
  * bağımlı (transitive Maven bağımlılığı zaten var, ama izole test bağlamının
  * bean'i bulabilmesi için tarama kapsamı da genişlemeli).
+ *
+ * <p>US-09.8.1: {@code com.digitalik.organization} da eklendi — {@code
+ * BankPaymentFileService} artık {@code organization.EmployeeRepository}/{@code
+ * EmployeeSalaryRecordRepository}'e bağımlı (AYNI gerekçe).
  */
 @SpringBootApplication(
         scanBasePackages = {
@@ -31,7 +35,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.leave",
             "com.digitalik.attendance",
             "com.digitalik.travel",
-            "com.digitalik.platform"
+            "com.digitalik.platform",
+            "com.digitalik.organization"
         })
 @EntityScan(
         basePackages = {
@@ -40,7 +45,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.leave",
             "com.digitalik.attendance",
             "com.digitalik.travel",
-            "com.digitalik.platform"
+            "com.digitalik.platform",
+            "com.digitalik.organization"
         })
 @EnableJpaRepositories(
         basePackages = {
@@ -49,7 +55,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
             "com.digitalik.leave",
             "com.digitalik.attendance",
             "com.digitalik.travel",
-            "com.digitalik.platform"
+            "com.digitalik.platform",
+            "com.digitalik.organization"
         })
 class PayrollTestApplication {
 

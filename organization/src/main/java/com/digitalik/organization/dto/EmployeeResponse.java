@@ -10,5 +10,6 @@ public record EmployeeResponse(
         LocalDate hireDate,
         String email,
         Long organizationUnitId,
-        Long jobTitleId) {
+        Long jobTitleId,
+        String iban) {
 }
