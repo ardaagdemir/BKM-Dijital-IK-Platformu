@@ -3021,3 +3021,28 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## Bölüm 9 — Ara durum notu (checkpoint)
+
+Aşağıdaki liste, `zesty-sleeping-reef` planındaki 10 maddenin şu ana kadarki durumunu özetliyor — her tamamlanan madde için ayrıntılı gerekçe/dosya listesi zaten kendi başlığı altında yukarıda mevcut; bu not yalnızca üst düzey bir ilerleme fotoğrafı.
+
+**Tamamlanan (7/10):**
+1. ✅ **C — US-09.3.1** Merkezi bildirim/şablon servisi (`core.notification`, commit `83e96f3`)
+2. ✅ **D — US-09.4.1** Merkezi CSV/Excel dışa aktarma bileşeni (`core.export`, commit `0564c8c`)
+3. ✅ **I — US-09.9.1** Hassas alanların şifrelenmesi — TC No + ücret (`core.security.Encrypted*Converter`, commit `7dc226d`)
+4. ✅ **`platform` modülü iskeleti** (boş pom + test app, commit `8102037`)
+5. ✅ **F — US-09.7.1** Genel dosya saklama servisi (`platform.file.FileStorageService`, `travel.ExpenseItem` üzerinde kanıtlandı, commit `128d6fa`)
+6. ✅ **G — US-09.7.2** ClamAV virüs tarama (3 yükleme noktasının tamamı, commit `96b51fc`)
+7. ✅ **B — US-09.2.1/US-09.2.2** Onay zinciri motoru + `recruitment.HiringRequest` migrasyonu (commit `70f7817`)
+
+**Kalan (4/10, plandaki sıraya göre):**
+8. ⏳ **E — US-09.5.1** Dinamik/parametrik özel alan çerçevesi — `platform`'da jenerik EAV-lite (`CustomFieldDefinition`/`CustomFieldValue`), `organization.Employee` üzerinde kanıtlanacak (FR-406, "yabancı dil seviyesi" örneği). Henüz başlanmadı.
+9. ⏳ **H — US-09.8.1** Banka ödeme dosyası — `EmployeeSalaryRecord.iban` alanı, mod-97 `core.validation.IbanValidator`, `payroll`→`organization` yeni tek-yönlü bağımlılık, `core.export.CsvExporter` ile CSV üretimi. I tamamlandığı için önü açık.
+10. ⏳ **A — US-09.1.3** TOTP tabanlı MFA — mevcut e-posta step-up akışına ALTERNATİF (silinmiyor), `dev.samstevens.totp` kütüphanesi, sır `auth.User`'da. Bağımsız/izole, herhangi bir sırada yapılabilir.
+11. ⏳ **J — US-09.10.2** Zamanlanmış veritabanı yedeği — `prodrigestivill/postgres-backup-local` Docker servisi + canlı al→sıfırla→geri-yükle doğrulaması. Tamamen bağımsız, planın son maddesi.
+
+**Kapsam dışı (roadmap gerekçesiyle, değişmedi):** US-09.1.1 (AD/LDAP), US-09.1.2 (SSO/OIDC/SAML), US-09.6.1 (audit immutability — kullanıcı onaylamadı), US-09.6.2 (merkezi log sistemi), US-09.8.2 (SGK/e-Devlet), US-09.8.3 (eski bordro taşıma), US-09.9.2 (CI SAST/SCA — kullanıcı onaylamadı). US-09.10.1 (Docker imajı) zaten tamamlanmıştı, ek iş gerekmedi.
+
+Sıradaki adım: **E** (dinamik özel alan çerçevesi).
