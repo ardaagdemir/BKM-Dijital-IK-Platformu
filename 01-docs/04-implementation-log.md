@@ -2880,3 +2880,35 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## US-09.9.1 — Hassas alanların şifrelenmesi
+
+**Özet:** `core.security.EncryptedStringConverter`/`EncryptedBigDecimalConverter` (AES-GCM) — `organization.Employee.nationalId` (TC No) ve `organization.EmployeeSalaryRecord.amount` (ücret) artık DB'de şifreli saklanıyor. Kabul kriteri: "Sütun seviyesi şifreleme uygulanır."
+
+**Tasarım kararları:**
+- **Standart RASTGELE-IV AES-GCM DEĞİL, DETERMİNİSTİK AES-GCM kullanıldı** (IV, rastgele değil, açık metin + anahtardan HMAC-SHA256 ile türetiliyor) — bu BİLİNÇLİ ve ZORUNLU bir karar: `Employee.nationalId` üzerinde hem bir DB seviyesi `UNIQUE` kısıtı HEM de `existsByNationalId`/`existsByNationalIdAndIdNot` eşitlik sorguları VAR. Standart rastgele-IV şemada aynı açık metin her seferinde FARKLI bir şifreli metin üretir — bu hem UNIQUE kısıtını hem eşitlik sorgularını sessizce anlamsız hale getirirdi (iki farklı çalışan aynı TC No ile kaydedilebilirdi). **Bilinen ödünleşim:** deterministik şifreleme, aynı açık metne sahip iki satırın şifreli halinin de aynı olacağını ima eder — bu, eşitlik sorgusu/UNIQUE kısıtı ihtiyacı olan bir alan için endüstride kabul edilen, bilinçli bir ödünleşimdir ("deterministic AEAD" deseni) ve javadoc'ta açıkça belgelendi.
+- **`EncryptedBigDecimalConverter`, kendi AES-GCM mantığını TEKRARLAMIYOR** — `EncryptedStringConverter`'a delege ediyor (metne çevirip şifreler, çözüp geri `BigDecimal`'e çevirir) — DRY.
+- **`amount` ŞİFRELENDİ (roadmap'in üçü de istediği TC No/IBAN/ücret listesine sadık kalındı)** — kod tabanında bu alanı DB seviyesinde toplayan/filtreleyen bir SQL sorgusu YOK (`payroll.PayrollConsolidationService` kayıtları tek tek okuyor, SUM/WHERE kullanmıyor), bu yüzden şifrelemenin gelecekteki bir agregasyon ihtiyacıyla çatışma riski yok.
+- **Dönüştürücüler `@Component` olarak Spring bean'i** — Hibernate'in Spring Boot entegrasyonu `@Converter` sınıflarını Spring container'ından çözüyor, `@Value("${app.security.encryption-key}")` constructor injection'ı mümkün kılıyor.
+- **Yan etki — `core.notification`'daki AYNI cascade tekrarlandı:** `EncryptedStringConverter`/`EncryptedBigDecimalConverter`, `core`'a bağımlı OLAN HER modülün izole test bağlamına component-scan ile dahil oluyor ve `app.security.encryption-key` bekliyor — bu nedenle mail config'e ek olarak AYNI 12 modülün (+ `bootstrap`'ın KENDİ, `src/main/resources/application.yml`'i test classpath'inde TAMAMEN EZEN `src/test/resources/application.yml`'i) test kaynaklarına bir test-only şifreleme anahtarı eklendi.
+- **Sütun tipleri genişletildi** (`national_id VARCHAR(11)` → `VARCHAR(255)`, `amount NUMERIC(12,2)` → `VARCHAR(255)`) — şifreli (Base64: IV+ciphertext+GCM tag) değer, ham TC No/tutardan çok daha uzun. Projede henüz gerçek üretim verisi olmadığından (yalnızca seed/test verisi) basit bir tip değişikliği yeterli, karmaşık bir veri-dönüştürme migrasyonu GEREKMEDİ.
+
+**Değişen/eklenen dosyalar:**
+- `core/src/main/java/com/digitalik/core/security/EncryptedStringConverter.java`, `EncryptedBigDecimalConverter.java` (yeni)
+- `core/src/test/java/com/digitalik/core/security/EncryptedStringConverterTest.java` (4 test), `EncryptedBigDecimalConverterTest.java` (3 test)
+- `organization/src/main/resources/db/migration/V61__widen_national_id_and_amount_for_encryption.sql` (yeni)
+- `organization/src/main/java/com/digitalik/organization/entity/Employee.java`, `EmployeeSalaryRecord.java` — `@Convert` eklendi
+- `bootstrap/src/main/resources/application.yml`, `bootstrap/src/test/resources/application.yml` — `app.security.encryption-key` eklendi
+- 12 modülün (`auth`, `leave`, `organization`, `recruitment`, `performance`, `attendance`, `training`, `travel`, `discipline`, `feedback`, `amenities`, `payroll`) `src/test/resources/application.yml`'i — test-only şifreleme anahtarı eklendi
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı; V61 uygulandı, Hibernate `ddl-auto: validate` hatasız (genişletilmiş VARCHAR(255) kolonları entity eşlemesiyle uyumlu). Çalışan oluşturuldu (TC No: `10000000146`) → `GET /api/organization/employees/{id}` doğru şekilde DÜZ METİN TC No döndürdü (API round-trip doğru); `psql` ile DOĞRUDAN `employees.national_id` sorgulandığında değerin Base64 şifreli metin olduğu (`1zXVb6bjyUIubnzadHZV/94X1Z1rbwMfhW8OT5qkiMTk+LzbnagW`) doğrulandı — düz metin DEĞİL. Aynı doğrulama `employee_salary_records.amount` için de yapıldı. **Kritik test:** AYNI TC No ile İKİNCİ bir çalışan oluşturulmaya çalışıldı → 409 "Bu TC Kimlik No ile kayıtlı bir çalışan zaten var." (deterministik şifrelemenin UNIQUE kısıtını/eşitlik sorgusunu koruduğunun canlı kanıtı). Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (30), auth (28), organization (75), leave (53), recruitment (39), performance (44), attendance (28), training (22), travel (18), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 446 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

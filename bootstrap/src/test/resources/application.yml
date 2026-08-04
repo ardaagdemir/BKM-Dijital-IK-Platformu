@@ -20,3 +20,8 @@ spring:
 app:
   mail:
     from-address: noreply@dijitalik.local
+  security:
+    # US-09.9.1: core.security.EncryptedStringConverter, bu context'e de dahil
+    # (bootstrap tüm modülleri toplar) — AYNI gerekçeyle (yukarıdaki mail notu)
+    # gerçek bir anahtar DEĞİL, yalnızca test amaçlı.
+    encryption-key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=

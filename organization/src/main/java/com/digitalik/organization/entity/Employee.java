@@ -1,7 +1,9 @@
 package com.digitalik.organization.entity;
 
 import com.digitalik.core.entity.BaseEntity;
+import com.digitalik.core.security.EncryptedStringConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
@@ -9,6 +11,11 @@ import java.time.LocalDate;
 /**
  * US-03.2.1: Bir çalışanın temel kaydı (ad-soyad, TC No, işe giriş tarihi,
  * iletişim).
+ *
+ * <p>US-09.9.1: {@code nationalId}, {@link EncryptedStringConverter} ile
+ * DB'de şifreli saklanıyor — bkz. o sınıfın javadoc'u (deterministik
+ * şifreleme, bu alanın DB {@code UNIQUE} kısıtı/{@code existsByNationalId}
+ * eşitlik sorgusuyla uyumlu kalması için ZORUNLU).
  *
  * <p>US-03.2.2: {@code organizationUnitId}/{@code jobTitleId}, diğer
  * ilişkiler (bkz. {@link OrganizationUnit#getParentId()}) ile aynı
@@ -33,6 +40,7 @@ public class Employee extends BaseEntity {
     @Column(nullable = false)
     private String lastName;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(nullable = false, unique = true)
     private String nationalId;
 

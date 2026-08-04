@@ -38,5 +38,11 @@ app:
   security:
     max-failed-attempts: 5
     lockout-duration-minutes: 15
+    # US-09.9.1: Base64, 256-bit AES anahtarı — hassas sütunların (TC No, ücret,
+    # IBAN) şifrelenmesi için (bkz. core.security.EncryptedStringConverter).
+    # Varsayılan yalnızca YEREL/GELİŞTİRME ortamı içindir (seed admin parolasındaki
+    # AYNI kural); üretimde ENCRYPTION_KEY ortam değişkeni GERÇEK bir anahtarla
+    # ayarlanmalıdır.
+    encryption-key: ${ENCRYPTION_KEY:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=}
   mail:
     from-address: ${MAIL_FROM_ADDRESS:noreply@dijitalik.local}

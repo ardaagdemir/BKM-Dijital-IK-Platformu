@@ -12,3 +12,10 @@ spring:
 app:
   mail:
     from-address: noreply@dijitalik.local
+
+  security:
+    # US-09.9.1: core.security.EncryptedStringConverter core modülünde yaşıyor ve
+    # AYNI cascade nedeniyle (bkz. app.mail.from-address yorumu) bu modülün izole
+    # test bağlamına da dahil oluyor — @Value("${app.security.encryption-key}")
+    # olmadan bean oluşturulamaz. Gerçek bir anahtar DEĞİL, yalnızca test amaçlı.
+    encryption-key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
