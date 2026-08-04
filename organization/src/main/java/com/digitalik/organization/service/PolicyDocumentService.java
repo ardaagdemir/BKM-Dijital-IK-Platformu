@@ -4,20 +4,29 @@ import com.digitalik.organization.entity.PolicyDocument;
 import com.digitalik.organization.entity.PolicyDocumentStatus;
 import com.digitalik.organization.exception.PolicyDocumentNotFoundException;
 import com.digitalik.organization.repository.PolicyDocumentRepository;
+import com.digitalik.platform.file.InfectedFileException;
+import com.digitalik.platform.file.VirusScanService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
  * US-08I.1.1: Politika dokümanı yükleme/versiyonlama. Kabul kriteri:
  * "Yeni versiyon eskisini arşivler."
+ *
+ * <p>US-09.7.2: {@link VirusScanService} — kaydetmeden ÖNCE tarama.
+ * Bu entity {@code platform.file.FileStorageService}'e taşınmadığından
+ * (bkz. o servisin javadoc'u), tarama BURADA doğrudan çağrılıyor.
  */
 @Service
 public class PolicyDocumentService {
 
     private final PolicyDocumentRepository policyDocumentRepository;
+    private final VirusScanService virusScanService;
 
-    public PolicyDocumentService(PolicyDocumentRepository policyDocumentRepository) {
+    public PolicyDocumentService(
+            PolicyDocumentRepository policyDocumentRepository, VirusScanService virusScanService) {
         this.policyDocumentRepository = policyDocumentRepository;
+        this.virusScanService = virusScanService;
     }
 
     /**
@@ -34,6 +43,9 @@ public class PolicyDocumentService {
             String title, String fileName, String contentType, byte[] documentData, Long previousVersionId) {
         if (fileName == null || contentType == null || documentData == null || documentData.length == 0) {
             throw new IllegalArgumentException("Doküman dosyası boş olamaz.");
+        }
+        if (virusScanService.isInfected(documentData)) {
+            throw new InfectedFileException();
         }
 
         int version;

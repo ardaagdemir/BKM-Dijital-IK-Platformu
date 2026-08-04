@@ -25,3 +25,9 @@ app:
     # (bootstrap tüm modülleri toplar) — AYNI gerekçeyle (yukarıdaki mail notu)
     # gerçek bir anahtar DEĞİL, yalnızca test amaçlı.
     encryption-key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+  # US-09.7.2: platform.file.ClamAvVirusScanService bu context'e de dahil —
+  # yalnızca bean'in KURULABİLMESİ için (bu test hiçbir yükleme akışını
+  # çalıştırmıyor, gerçek bir ClamAV'a bağlanılmaz).
+  clamav:
+    host: localhost
+    port: 3310

@@ -29,6 +29,23 @@ services:
       - "8025:8025"
       - "1025:1025"
 
+  # US-09.7.2: Yüklenen dosyaların (politika dokümanı, aday CV'si, masraf belgesi)
+  # gerçek zamanlı virüs taraması — self-hosted, ücretsiz/açık kaynak. İlk
+  # başlangıçta virüs imza veritabanını indirdiğinden (freshclam) birkaç dakika
+  # sürebilir; bu nedenle backend yalnızca servisin BAŞLAMASINI bekliyor
+  # (mailpit'teki AYNI `service_started` deseni), sağlıklı olmasını DEĞİL —
+  # tarama isteği ClamAV tam hazır olmadan gelirse bağlantı hatası olarak
+  # (500) yüzeye çıkar, kalıcı bir sorun değildir.
+  clamav:
+    image: clamav/clamav:stable
+    # Resmi imaj yalnızca amd64 için yayınlanıyor (arm64/Apple Silicon YOK) —
+    # Docker Desktop'ın Rosetta/QEMU emülasyonuyla çalıştırılıyor. Daha az
+    # bakımlı bir topluluk imajı yerine RESMİ imajın emülasyonla
+    # çalıştırılması tercih edildi.
+    platform: linux/amd64
+    ports:
+      - "3310:3310"
+
   backend:
     build:
       context: .
@@ -40,12 +57,16 @@ services:
       DB_PASSWORD: dijitalik
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
       mailpit:
+        condition: service_started
+      clamav:
         condition: service_started
 
   frontend:

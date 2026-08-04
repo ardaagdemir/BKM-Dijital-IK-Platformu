@@ -2947,3 +2947,39 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## US-09.7.2 — Virüs tarama (ClamAV)
+
+**Özet:** `platform.file.VirusScanService` (+ gerçek implementasyonu `ClamAvVirusScanService`) — yüklenen TÜM dosyalar (politika dokümanı, aday CV'si, masraf belgesi) kaydedilmeden ÖNCE ClamAV ile taranıyor. Kabul kriteri: "Tarama servisi entegre edilir."
+
+**Tasarım kararları:**
+- **Herhangi bir üçüncü parti istemci kütüphanesi KULLANILMADI** — ClamAV'ın `clamd` daemon'ının "INSTREAM" TCP protokolü (4 bayt big-endian uzunluk öneki + veri parçası, sıfır-uzunluklu parça ile sonlandırma) yeterince basit olduğundan doğrudan `java.net.Socket` ile uygulandı; ekstra bağımlılık gerekmedi.
+- **`VirusScanService.isInfected(byte[]): boolean`** — bilinçli olarak BASİT bir imza (bir `ScanResult` record'u DEĞİL) seçildi: bu, Mockito'nun stub'lanmamış `boolean` metotlar için varsayılan `false` dönmesi sayesinde, test ortamlarında `@MockBean`/stub bean'lerin HİÇBİR açık stub'lama olmadan "enfekte değil" davranmasını sağlıyor.
+- **İki entegrasyon noktası, US-09.7.1'in taşıma kararıyla TUTARLI:** (1) `platform.file.FileStorageService.store(...)` İÇİNDE (yalnızca `travel.ExpenseItem` bunu kullanıyor) — enfekte dosya HİÇ persist edilmiyor; (2) `organization.PolicyDocumentService`/`recruitment.CandidateService`'in kendi yükleme akışlarına DOĞRUDAN çağrı (bu ikisi `FileStorageService`'e taşınmadığından). Tarama, dosya saklama kararından BAĞIMSIZ olarak PROJEDEKİ TÜM yükleme noktalarını kapsıyor.
+- **Test ortamında GERÇEK ClamAV YOK** — her `<Modül>TestApplication`'a (`platform`, `travel`, `payroll`, `organization`, `recruitment`) `@Primary` bir stub `VirusScanService` bean'i (`data -> false`) eklendi. **Öğrenilen ders:** Spring, `@Primary` olmayan bean'leri de (component-scan ile bulunan gerçek `ClamAvVirusScanService` dahil) singleton context başlatılırken EAGER olarak inşa ediyor — bu yüzden `app.clamav.host`/`port`'un test config'inde de (dummy değerlerle) var olması GEREKTİ, yoksa `@Value` çözümlenemediğinden bean inşası (ve dolayısıyla TÜM context) başarısız oluyordu.
+- **`docker-compose.yml`'e `clamav` servisi eklendi** — resmi `clamav/clamav:stable` imajı yalnızca `amd64` için yayınlanıyor (Apple Silicon/arm64 YOK); daha az bakımlı bir topluluk imajı yerine `platform: linux/amd64` ile Docker Desktop'ın Rosetta/QEMU emülasyonu tercih edildi. `backend`, mailpit'teki AYNI desenle yalnızca servisin BAŞLAMASINI bekliyor (`service_started`), sağlıklı olmasını DEĞİL.
+- **Bu story'nin TESTİ sırasında GERÇEK bir bug bulundu ve düzeltildi:** `travel.TravelExceptionHandler`'a `InfectedFileException` eşlemesi eklenmeyi UNUTULMUŞTU (yalnızca `StoredFileNotFoundException` eklenmişti) — canlı EICAR testinde `travel` ucu 422 yerine 500 döndü; `organization`/`recruitment` uçları doğru çalışıyordu. Düzeltildi ve HER ÜÇ ucun da testi eklendi (`@MockBean VirusScanService` + `isInfected` → `true` stub'lanarak) — bu regresyon bir daha sessizce geri gelemez.
+
+**Değişen/eklenen dosyalar:**
+- `platform/src/main/java/com/digitalik/platform/file/VirusScanService.java`, `ClamAvVirusScanService.java`, `InfectedFileException.java` (yeni)
+- `platform/src/main/java/com/digitalik/platform/file/FileStorageService.java` — tarama entegrasyonu
+- `platform/src/test/java/com/digitalik/platform/PlatformTestApplication.java`, `travel/.../TravelTestApplication.java`, `payroll/.../PayrollTestApplication.java`, `organization/.../OrganizationTestApplication.java`, `recruitment/.../RecruitmentTestApplication.java` — `@Primary` stub `VirusScanService` bean'i
+- `organization/pom.xml`, `recruitment/pom.xml` — `platform` bağımlılığı eklendi
+- `organization/.../service/PolicyDocumentService.java`, `recruitment/.../service/CandidateService.java` — doğrudan tarama entegrasyonu
+- `organization/.../exception/OrganizationExceptionHandler.java`, `recruitment/.../exception/RecruitmentExceptionHandler.java`, `travel/.../exception/TravelExceptionHandler.java` — `InfectedFileException` → 422 eşlemesi
+- `bootstrap/src/main/resources/application.yml`, `bootstrap/src/test/resources/application.yml` — `app.clamav.host`/`port`
+- 13 modülün test kaynaklarına dummy `app.clamav.host`/`port` config'i eklendi (cascade)
+- `docker-compose.yml` — `clamav` servisi (+ `platform: linux/amd64`)
+- `travel/.../controller/ExpenseItemControllerTest.java`, `organization/.../controller/PolicyDocumentControllerTest.java`, `recruitment/.../controller/CandidateControllerTest.java` — enfekte dosya reddi testi (3 yeni test)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı (bu Mac'te ClamAV'ın virüs veritabanı imaja GÖMÜLÜ geldiğinden, freshclam indirmesi beklenenden HIZLI oldu — ~30 saniyede "healthy"). `docker exec` ile ClamAV'a doğrudan EICAR test dizesi verildi → "Eicar-Test-Signature FOUND" (ClamAV'ın kendisi doğru çalışıyor, sanity check). Sonra uygulamanın GERÇEK üç yükleme ucundan EICAR yüklendi: `POST /api/travel/requests/{id}/expense-items` → 422 "Dosyada virüs/kötü amaçlı içerik tespit edildi." (TravelExceptionHandler düzeltmesinden SONRA); `POST /api/documents` → AYNI 422; `POST /api/recruitment/candidates/applications` (kimliksiz uç) → AYNI 422. TEMİZ bir dosya ise normal şekilde kabul edildi (201). `psql` ile DOĞRUDAN kontrol: `stored_files`/`expense_items`/`policy_documents`/`candidates` tablolarının HİÇBİRİNDE enfekte içerik/orphan kayıt YOK — yalnızca temiz yükleme persist edildi. Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (30), platform (4), auth (28), organization (76), leave (53), recruitment (40), performance (44), attendance (28), training (22), travel (19), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 453 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

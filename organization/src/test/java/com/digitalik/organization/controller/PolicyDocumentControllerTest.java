@@ -1,16 +1,20 @@
 package com.digitalik.organization.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.digitalik.platform.file.VirusScanService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,21 @@ class PolicyDocumentControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private VirusScanService virusScanService;
+
+    /** US-09.7.2 kabul kriteri: "Tarama servisi entegre edilir." */
+    @Test
+    void enfekteDosyaReddedilirVe422Doner() throws Exception {
+        when(virusScanService.isInfected(any())).thenReturn(true);
+        MockMultipartFile file = new MockMultipartFile("file", "eicar.txt", "text/plain", "enfekte-icerik".getBytes());
+
+        mockMvc.perform(multipart("/api/documents").file(file).param("title", "Enfekte Doküman"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.title").value("Dosya reddedildi"))
+                .andExpect(jsonPath("$.detail").value("Dosyada virüs/kötü amaçlı içerik tespit edildi."));
+    }
 
     private JsonNode uploadV1(String title) throws Exception {
         MockMultipartFile file =

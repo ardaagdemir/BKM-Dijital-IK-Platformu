@@ -1,5 +1,7 @@
 package com.digitalik.recruitment.service;
 
+import com.digitalik.platform.file.InfectedFileException;
+import com.digitalik.platform.file.VirusScanService;
 import com.digitalik.recruitment.entity.Candidate;
 import com.digitalik.recruitment.entity.CandidateStage;
 import com.digitalik.recruitment.exception.CandidateNotFoundException;
@@ -18,14 +20,19 @@ import org.springframework.stereotype.Service;
  * <p>US-05.4.2: {@link #convertToEmployee} ile aday "dönüştürüldü" olarak
  * işaretlenir; {@code organization.Employee} tablosunda GERÇEK bir kayıt
  * OLUŞTURMAZ (bkz. {@code Candidate.convertToEmployee()}'deki ayrıntılı not).
+ *
+ * <p>US-09.7.2: {@link VirusScanService} ile CV taraması — bu uç kimliksiz/
+ * herkese açık olduğundan (yukarı bkz.) özellikle önemli bir giriş noktası.
  */
 @Service
 public class CandidateService {
 
     private final CandidateRepository candidateRepository;
+    private final VirusScanService virusScanService;
 
-    public CandidateService(CandidateRepository candidateRepository) {
+    public CandidateService(CandidateRepository candidateRepository, VirusScanService virusScanService) {
         this.candidateRepository = candidateRepository;
+        this.virusScanService = virusScanService;
     }
 
     public Candidate apply(
@@ -44,6 +51,9 @@ public class CandidateService {
             throw new IllegalArgumentException("CV dosyası boş olamaz.");
         }
         assertNotBlank(cvFileName, "CV dosya adı boş olamaz.");
+        if (virusScanService.isInfected(cvData)) {
+            throw new InfectedFileException();
+        }
 
         return candidateRepository.save(
                 new Candidate(firstName, lastName, email, appliedPosition, cvFileName, cvContentType, cvData));

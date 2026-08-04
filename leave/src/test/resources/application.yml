@@ -18,3 +18,11 @@ app:
     # test bağlamına da dahil oluyor — @Value("${app.security.encryption-key}")
     # olmadan bean oluşturulamaz. Gerçek bir anahtar DEĞİL, yalnızca test amaçlı.
     encryption-key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+
+  clamav:
+    # US-09.7.2: platform.file.ClamAvVirusScanService de bu context'e dahil
+    # (AYNI cascade, bkz. app.mail.from-address yorumu) — yalnızca bean'in
+    # KURULABİLMESİ için (gerçek çağrılar platform.PlatformTestApplication'daki
+    # @Primary stub tarafından karşılanıyor, buraya hiç ulaşmaz).
+    host: localhost
+    port: 3310

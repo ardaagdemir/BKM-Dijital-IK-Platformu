@@ -1,11 +1,14 @@
 package com.digitalik.travel.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.digitalik.platform.file.VirusScanService;
 import com.digitalik.travel.dto.CreateTravelRequestRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,6 +37,31 @@ class ExpenseItemControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private VirusScanService virusScanService;
+
+    /**
+     * US-09.7.2 kabul kriteri: "Tarama servisi entegre edilir." Mockito'nun
+     * stub'lanmamış {@code boolean} metotları için varsayılan {@code false}
+     * (enfekte değil) dönmesi, diğer tüm testlerin bu mock ile davranış
+     * değiştirmeden geçmesini sağlıyor — yalnızca bu test AÇIKÇA {@code true}
+     * stub'luyor.
+     */
+    @Test
+    void enfekteBelgeReddedilirVe422Doner() throws Exception {
+        when(virusScanService.isInfected(any())).thenReturn(true);
+        Long travelRequestId = seyahatTalebiOlustur();
+        MockMultipartFile document =
+                new MockMultipartFile("document", "eicar.txt", MediaType.TEXT_PLAIN_VALUE, "enfekte-icerik".getBytes());
+
+        mockMvc.perform(multipart("/api/travel/requests/" + travelRequestId + "/expense-items")
+                        .file(document)
+                        .param("amount", "50"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.title").value("Dosya reddedildi"))
+                .andExpect(jsonPath("$.detail").value("Dosyada virüs/kötü amaçlı içerik tespit edildi."));
+    }
 
     @Test
     void masrafKalemiTutarVeBelgeIleKaydedilir() throws Exception {

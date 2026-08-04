@@ -12,12 +12,19 @@
 
     <artifactId>recruitment</artifactId>
     <name>recruitment</name>
-    <description>İşe alım modülü (roadmap Bölüm 5). Yalnızca core'a bağımlıdır.</description>
+    <description>İşe alım modülü (roadmap Bölüm 5). Yalnızca core'a, ARTI US-09.7.2 için platform'a
+        (virüs tarama) bağımlıdır.</description>
 
     <dependencies>
         <dependency>
             <groupId>com.bkm</groupId>
             <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>platform</artifactId>
             <version>${project.version}</version>
         </dependency>
 

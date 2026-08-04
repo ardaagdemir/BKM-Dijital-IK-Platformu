@@ -46,3 +46,8 @@ app:
     encryption-key: ${ENCRYPTION_KEY:AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=}
   mail:
     from-address: ${MAIL_FROM_ADDRESS:noreply@dijitalik.local}
+  # US-09.7.2: ClamAV'ın clamd daemon'ı (bkz. docker-compose.yml'deki clamav
+  # servisi) — mailpit'teki AYNI host/port dışsallaştırma deseni.
+  clamav:
+    host: ${CLAMAV_HOST:localhost}
+    port: ${CLAMAV_PORT:3310}

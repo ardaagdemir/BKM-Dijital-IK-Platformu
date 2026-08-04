@@ -14,13 +14,19 @@
     <name>organization</name>
     <description>Organizasyon yapısı ve çalışan yönetimi modülü (roadmap Bölüm 3), ayrıca doküman yönetimi ve
         görev tanımları (roadmap Bölüm 8, EPIC-08I — eskiden ayrı `document` modülüydü; `JobDescription`
-        kavramsal olarak zaten `JobTitle`'ın bir uzantısı olduğundan buraya birleştirildi). Yalnızca core'a
-        bağımlıdır.</description>
+        kavramsal olarak zaten `JobTitle`'ın bir uzantısı olduğundan buraya birleştirildi). Yalnızca core'a,
+        ARTI US-09.7.2 için platform'a (virüs tarama) bağımlıdır.</description>
 
     <dependencies>
         <dependency>
             <groupId>com.bkm</groupId>
             <artifactId>core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bkm</groupId>
+            <artifactId>platform</artifactId>
             <version>${project.version}</version>
         </dependency>
 

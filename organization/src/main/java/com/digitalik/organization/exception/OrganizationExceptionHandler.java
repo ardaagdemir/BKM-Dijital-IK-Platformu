@@ -1,6 +1,7 @@
 package com.digitalik.organization.exception;
 
 import com.digitalik.organization.controller.OrganizationUnitController;
+import com.digitalik.platform.file.InfectedFileException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -75,6 +76,14 @@ class OrganizationExceptionHandler {
     ProblemDetail handlePolicyDocumentNotFound(PolicyDocumentNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Doküman bulunamadı");
+        return problem;
+    }
+
+    /** US-09.7.2: Yüklenen dosya enfekte tespit edildiğinde (bkz. {@code PolicyDocumentService}). */
+    @ExceptionHandler(InfectedFileException.class)
+    ProblemDetail handleInfectedFile(InfectedFileException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setTitle("Dosya reddedildi");
         return problem;
     }
 

@@ -12,17 +12,25 @@ import org.springframework.stereotype.Service;
  * versiyonlama/CV-özgü mantıkları nedeniyle); virüs tarama (US-09.7.2) yine
  * de bu servisten BAĞIMSIZ olarak o ikisinin kendi yükleme akışlarına
  * doğrudan entegre edilecek.
+ *
+ * <p>US-09.7.2: {@link #store} artık kaydetmeden ÖNCE {@link VirusScanService}
+ * ile tarıyor — enfekte bir dosya HİÇ persist edilmez.
  */
 @Service
 public class FileStorageService {
 
     private final StoredFileRepository storedFileRepository;
+    private final VirusScanService virusScanService;
 
-    public FileStorageService(StoredFileRepository storedFileRepository) {
+    public FileStorageService(StoredFileRepository storedFileRepository, VirusScanService virusScanService) {
         this.storedFileRepository = storedFileRepository;
+        this.virusScanService = virusScanService;
     }
 
     public StoredFile store(String fileName, String contentType, byte[] fileData) {
+        if (virusScanService.isInfected(fileData)) {
+            throw new InfectedFileException();
+        }
         return storedFileRepository.save(new StoredFile(fileName, contentType, fileData));
     }
 

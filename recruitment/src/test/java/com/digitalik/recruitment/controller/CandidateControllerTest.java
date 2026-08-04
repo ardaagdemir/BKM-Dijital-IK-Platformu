@@ -1,17 +1,21 @@
 package com.digitalik.recruitment.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.digitalik.platform.file.VirusScanService;
 import com.digitalik.recruitment.dto.CandidateStageRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +41,26 @@ class CandidateControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private VirusScanService virusScanService;
+
+    /** US-09.7.2 kabul kriteri: "Tarama servisi entegre edilir." */
+    @Test
+    void enfekteCvReddedilirVe422Doner() throws Exception {
+        when(virusScanService.isInfected(any())).thenReturn(true);
+        MockMultipartFile cv = new MockMultipartFile("cv", "eicar.txt", "text/plain", "enfekte-icerik".getBytes());
+
+        mockMvc.perform(multipart("/api/recruitment/candidates/applications")
+                        .file(cv)
+                        .param("firstName", "Ahmet")
+                        .param("lastName", "Yılmaz")
+                        .param("email", "ahmet@ornek.com")
+                        .param("appliedPosition", "Yazılım Mühendisi"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.title").value("Dosya reddedildi"))
+                .andExpect(jsonPath("$.detail").value("Dosyada virüs/kötü amaçlı içerik tespit edildi."));
+    }
 
     @Test
     void basvuruOlusturulur() throws Exception {

@@ -1,5 +1,6 @@
 package com.digitalik.travel.exception;
 
+import com.digitalik.platform.file.InfectedFileException;
 import com.digitalik.platform.file.StoredFileNotFoundException;
 import com.digitalik.travel.controller.TravelRequestController;
 import org.springframework.core.Ordered;
@@ -51,6 +52,14 @@ class TravelExceptionHandler {
     ProblemDetail handleStoredFileNotFound(StoredFileNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("Belge bulunamadı");
+        return problem;
+    }
+
+    /** US-09.7.2: Yüklenen belge enfekte tespit edildiğinde (bkz. {@code FileStorageService.store}). */
+    @ExceptionHandler(InfectedFileException.class)
+    ProblemDetail handleInfectedFile(InfectedFileException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setTitle("Dosya reddedildi");
         return problem;
     }
 }

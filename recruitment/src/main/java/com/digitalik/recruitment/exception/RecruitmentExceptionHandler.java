@@ -1,5 +1,6 @@
 package com.digitalik.recruitment.exception;
 
+import com.digitalik.platform.file.InfectedFileException;
 import com.digitalik.recruitment.controller.CandidateController;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -49,6 +50,14 @@ class RecruitmentExceptionHandler {
     ProblemDetail handleHiringRequestNotFound(HiringRequestNotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problem.setTitle("İşe alım talebi bulunamadı");
+        return problem;
+    }
+
+    /** US-09.7.2: Yüklenen CV enfekte tespit edildiğinde (bkz. {@code CandidateService}). */
+    @ExceptionHandler(InfectedFileException.class)
+    ProblemDetail handleInfectedFile(InfectedFileException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problem.setTitle("Dosya reddedildi");
         return problem;
     }
 
