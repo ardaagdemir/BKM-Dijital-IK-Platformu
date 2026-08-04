@@ -3028,7 +3028,7 @@ docker compose down
 
 Aşağıdaki liste, `zesty-sleeping-reef` planındaki 10 maddenin şu ana kadarki durumunu özetliyor — her tamamlanan madde için ayrıntılı gerekçe/dosya listesi zaten kendi başlığı altında yukarıda mevcut; bu not yalnızca üst düzey bir ilerleme fotoğrafı.
 
-**Tamamlanan (7/10):**
+**Tamamlanan (8/10):**
 1. ✅ **C — US-09.3.1** Merkezi bildirim/şablon servisi (`core.notification`, commit `83e96f3`)
 2. ✅ **D — US-09.4.1** Merkezi CSV/Excel dışa aktarma bileşeni (`core.export`, commit `0564c8c`)
 3. ✅ **I — US-09.9.1** Hassas alanların şifrelenmesi — TC No + ücret (`core.security.Encrypted*Converter`, commit `7dc226d`)
@@ -3036,13 +3036,47 @@ Aşağıdaki liste, `zesty-sleeping-reef` planındaki 10 maddenin şu ana kadark
 5. ✅ **F — US-09.7.1** Genel dosya saklama servisi (`platform.file.FileStorageService`, `travel.ExpenseItem` üzerinde kanıtlandı, commit `128d6fa`)
 6. ✅ **G — US-09.7.2** ClamAV virüs tarama (3 yükleme noktasının tamamı, commit `96b51fc`)
 7. ✅ **B — US-09.2.1/US-09.2.2** Onay zinciri motoru + `recruitment.HiringRequest` migrasyonu (commit `70f7817`)
+8. ✅ **E — US-09.5.1** Dinamik/parametrik özel alan çerçevesi (`platform.customfield`, `organization.Employee` üzerinde kanıtlandı)
 
-**Kalan (4/10, plandaki sıraya göre):**
-8. ⏳ **E — US-09.5.1** Dinamik/parametrik özel alan çerçevesi — `platform`'da jenerik EAV-lite (`CustomFieldDefinition`/`CustomFieldValue`), `organization.Employee` üzerinde kanıtlanacak (FR-406, "yabancı dil seviyesi" örneği). Henüz başlanmadı.
+**Kalan (3/10, plandaki sıraya göre):**
 9. ⏳ **H — US-09.8.1** Banka ödeme dosyası — `EmployeeSalaryRecord.iban` alanı, mod-97 `core.validation.IbanValidator`, `payroll`→`organization` yeni tek-yönlü bağımlılık, `core.export.CsvExporter` ile CSV üretimi. I tamamlandığı için önü açık.
 10. ⏳ **A — US-09.1.3** TOTP tabanlı MFA — mevcut e-posta step-up akışına ALTERNATİF (silinmiyor), `dev.samstevens.totp` kütüphanesi, sır `auth.User`'da. Bağımsız/izole, herhangi bir sırada yapılabilir.
 11. ⏳ **J — US-09.10.2** Zamanlanmış veritabanı yedeği — `prodrigestivill/postgres-backup-local` Docker servisi + canlı al→sıfırla→geri-yükle doğrulaması. Tamamen bağımsız, planın son maddesi.
 
 **Kapsam dışı (roadmap gerekçesiyle, değişmedi):** US-09.1.1 (AD/LDAP), US-09.1.2 (SSO/OIDC/SAML), US-09.6.1 (audit immutability — kullanıcı onaylamadı), US-09.6.2 (merkezi log sistemi), US-09.8.2 (SGK/e-Devlet), US-09.8.3 (eski bordro taşıma), US-09.9.2 (CI SAST/SCA — kullanıcı onaylamadı). US-09.10.1 (Docker imajı) zaten tamamlanmıştı, ek iş gerekmedi.
 
-Sıradaki adım: **E** (dinamik özel alan çerçevesi).
+---
+
+## US-09.5.1 — Dinamik/parametrik özel alan çerçevesi
+
+**Özet:** `platform.customfield` paketi — kabul kriteri: "Sistem yöneticisi olarak, kod değişikliği olmadan yeni bir alan tanımlamak istiyorum. Alan tipi (metin/sayı/tarih/seçim) parametrik tanımlanır ve ilgili formda görünür." Herhangi bir modülün varlığına (`entityType` + `entityId` üzerinden), o varlığın kendi şemasında olmayan bir alanı, kod yazmadan ekleyebilen jenerik bir EAV-lite (Entity-Attribute-Value) çerçevesi. `organization.Employee` üzerinde kanıtlandı (roadmap'in kendi örneği, FR-406).
+
+**Tasarım kararları:**
+- **`entityType` (String) + `entityId` (Long) üzerinden çalışıyor, `Employee`'ye FK YOK** — projede zaten her yerde kullanılan FK'siz modüller-arası güven sınırı deseninin AYNISI (`employeeId` gibi): `platform` hangi modülün hangi varlığına değer yazdığını bilmiyor, çağıran modül biliyor.
+- **Tip fark etmeksizin TEK bir `field_value` String kolonu** (seyrek nullable kolonlar yerine) — okuma/yazma anında `CustomFieldDefinition.fieldType`'a göre yorumlanıp doğrulanıyor (NUMBER → `Double.parseDouble`, DATE → ISO `LocalDate.parse`, SELECT → virgülle ayrılmış `selectOptions` listesinde arama, TEXT → doğrulamasız). **Öğrenilen ders:** kolon adı `field_value` olmak ZORUNDA — `value`, hem H2 hem PostgreSQL'de ayrılmış (reserved) bir kelime; ilk denemede `value` kullanıldı, izole testlerde H2 syntax hatasıyla YAKALANDI, PostgreSQL'e hiç ulaşmadan düzeltildi.
+- **`CustomFieldDefinitionService` (admin CRUD) ile `CustomFieldValueService` (değer okuma/yazma) AYRI sorumluluklar** — hangi alanların TANIMLI olduğu ile belirli bir kaydın DEĞERLERİ birbirinden bağımsız; `organization.EmployeeCustomFieldService` yalnızca ikinciyi `entityType="Employee"` ile sarmalıyor.
+- **US-09.5.1'in "formda görünür" kabul kriteri**, hiçbir modülde henüz bir admin ekranı olmadığından, `GET .../custom-fields` ucunun bir formun render edebileceği HER ŞEYİ (alan adı/tipi/seçenekler/zorunluluk) döndürmesiyle karşılandı — Bölüm 1-8'in "önce backend API, ekran sonra" deseniyle tutarlı.
+- **`platform.customfield`, `platform.approval`'ın KENDİ `@RestControllerAdvice`'ına (`ApprovalExceptionHandler`) İHTİYAÇ DUYMUYOR** — onun `basePackageClasses` kapsamı yalnızca `approval` paketini kapsıyor; kardeş paket `customfield` için AYRI, minimal bir `CustomFieldExceptionHandler` (yalnızca `AuthorizationDeniedException`→403) eklendi — `@Order(HIGHEST_PRECEDENCE)` yine zorunlu.
+- **`organization`'ın `PUT .../custom-fields` ucu, `EmployeeController`'ın diğer PUT uçlarıyla TUTARLI olarak rol kısıtlaması OLMADAN bırakıldı**; `GET` ise `getProfile`'daki AYNI `EmployeeAccessGuard` ile korunuyor (kişisel veri).
+
+**Değişen/eklenen dosyalar:**
+- `platform/src/main/resources/db/migration/V67__create_custom_field_tables.sql` (yeni) — `custom_field_definitions`, `custom_field_values`
+- `platform/src/main/java/com/digitalik/platform/customfield/{CustomFieldType,CustomFieldDefinition,CustomFieldValue}.java` (yeni)
+- `platform/src/main/java/com/digitalik/platform/customfield/{*Repository,CustomFieldDefinitionService,CustomFieldValueService,CustomFieldDefinitionController,CustomFieldExceptionHandler}.java` (yeni)
+- `platform/src/main/java/com/digitalik/platform/customfield/dto/*.java` (3 DTO, yeni)
+- `platform/src/test/java/com/digitalik/platform/customfield/{CustomFieldValueServiceTest,CustomFieldDefinitionControllerTest}.java` (8+4 test, yeni)
+- `organization/src/main/java/com/digitalik/organization/service/EmployeeCustomFieldService.java`, `controller/EmployeeCustomFieldController.java` (yeni)
+- `organization/src/test/java/com/digitalik/organization/controller/EmployeeCustomFieldControllerTest.java` (4 test, yeni)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE tamamlandı; V67 uygulandı ("Successfully applied 67 migrations"). Admin token ile: `GET /api/platform/custom-fields?entityType=Employee` → `[]` (henüz tanımsız); token OLMADAN aynı istek → 401. `POST` ile SELECT tipi "seviye" (A1-C2) ve TEXT tipi "notlar" alanları KOD YAZMADAN tanımlandı. Yeni bir çalışan oluşturulup `GET /api/organization/employees/{id}/custom-fields` → iki tanımlı alan, `value: null`. Geçersiz seçim değeri ("Z9") ile `PUT` → 400 "seviye geçerli bir seçenek değil."; geçerli değerlerle (`seviye: B2`, `notlar: ...`) `PUT` → 200, tekrar `GET` ile DEĞERLERİN KALICI olduğu doğrulandı (upsert çalıştı). Olmayan çalışan (999999) için `GET` → 404 "Çalışan bulunamadı." Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn -pl platform,organization -am test   # organization 76→80 (+4), platform +12 (customfield)
+mvn test   # tam reactor, BUILD SUCCESS, sıfır regresyon
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```
+
+Sıradaki adım: **H** (banka ödeme dosyası).
