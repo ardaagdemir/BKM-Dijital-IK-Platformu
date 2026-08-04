@@ -1,36 +1,45 @@
 package com.digitalik.leave.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.digitalik.core.notification.EmailNotificationService;
+import com.digitalik.core.notification.NotificationTemplateService;
 import com.digitalik.leave.entity.LeaveRequest;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
 /**
  * US-04.3.1 kabul kriteri: "SMTP üzerinden basit, sabit metinli bir e-posta
- * gönderilir." {@code JavaMailSender} gerçek bir SMTP sunucusuna bağlanmadan
- * mock'lanıyor — canlı SMTP doğrulaması Docker'da Mailpit ile yapılıyor (bkz.
- * docs/04-implementation-log.md).
+ * gönderilir." US-09.3.1 ile gönderim mekanizması {@code
+ * core.notification.EmailNotificationService}'e taşındı — bu test, GERÇEK
+ * bir {@code EmailNotificationService} (mock'lanmış {@code JavaMailSender}
+ * + gerçek {@code NotificationTemplateService} ile) kullanarak, doğru
+ * şablonun render edilip doğru alıcı/konu ile GERÇEKTEN gönderildiğini
+ * doğruluyor — {@code EmailNotificationService}'i mock'lamak yerine (bu
+ * ortamda Mockito'nun somut sınıf mock'lamasını desteklemeyen bir Java
+ * 24/ByteBuddy uyumsuzluğuna takılıyor), daha güçlü bir doğrulama.
  */
 class LeaveNotificationServiceTest {
 
     private static final String FROM_ADDRESS = "noreply@dijitalik.local";
 
+    private LeaveNotificationService newService(JavaMailSender javaMailSender) {
+        EmailNotificationService emailNotificationService =
+                new EmailNotificationService(javaMailSender, new NotificationTemplateService(), FROM_ADDRESS);
+        return new LeaveNotificationService(emailNotificationService);
+    }
+
     @Test
     void onaylananTalepIcinOnayEPostasiGonderilir() {
         JavaMailSender javaMailSender = mock(JavaMailSender.class);
-        LeaveNotificationService service = new LeaveNotificationService(javaMailSender, FROM_ADDRESS);
+        LeaveNotificationService service = newService(javaMailSender);
         LeaveRequest leaveRequest =
                 new LeaveRequest(1L, 2L, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7), "calisan@dijitalik.local");
         leaveRequest.approve();
@@ -38,18 +47,18 @@ class LeaveNotificationServiceTest {
         service.sendDecisionNotification(leaveRequest);
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender, times(1)).send(captor.capture());
+        verify(javaMailSender).send(captor.capture());
         SimpleMailMessage sent = captor.getValue();
         assertThat(sent.getTo()).containsExactly("calisan@dijitalik.local");
         assertThat(sent.getFrom()).isEqualTo(FROM_ADDRESS);
         assertThat(sent.getSubject()).isEqualTo("İzin Talebiniz Onaylandı");
-        assertThat(sent.getText()).contains("ONAYLANMIŞTIR");
+        assertThat(sent.getText()).contains("ONAYLANMIŞTIR").contains("2026-08-03 - 2026-08-07");
     }
 
     @Test
     void reddedilenTalepIcinRetEPostasiGerekceyleGonderilir() {
         JavaMailSender javaMailSender = mock(JavaMailSender.class);
-        LeaveNotificationService service = new LeaveNotificationService(javaMailSender, FROM_ADDRESS);
+        LeaveNotificationService service = newService(javaMailSender);
         LeaveRequest leaveRequest =
                 new LeaveRequest(1L, 2L, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7), "calisan@dijitalik.local");
         leaveRequest.reject("Yoğun dönem.");
@@ -66,25 +75,12 @@ class LeaveNotificationServiceTest {
     @Test
     void ePostaAdresiYoksaHicGonderilmez() {
         JavaMailSender javaMailSender = mock(JavaMailSender.class);
-        LeaveNotificationService service = new LeaveNotificationService(javaMailSender, FROM_ADDRESS);
+        LeaveNotificationService service = newService(javaMailSender);
         LeaveRequest leaveRequest = new LeaveRequest(1L, 2L, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7));
         leaveRequest.approve();
 
         service.sendDecisionNotification(leaveRequest);
 
         verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
-    }
-
-    /** Kabul kriterinin doğrudan istemediği ama sağlam bir davranış: SMTP hatası kararı bozmamalı. */
-    @Test
-    void smtpHatasiYutulurVeYayilmaz() {
-        JavaMailSender javaMailSender = mock(JavaMailSender.class);
-        doThrow(new MailSendException("bağlantı hatası")).when(javaMailSender).send(any(SimpleMailMessage.class));
-        LeaveNotificationService service = new LeaveNotificationService(javaMailSender, FROM_ADDRESS);
-        LeaveRequest leaveRequest =
-                new LeaveRequest(1L, 2L, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7), "calisan@dijitalik.local");
-        leaveRequest.approve();
-
-        assertThatCode(() -> service.sendDecisionNotification(leaveRequest)).doesNotThrowAnyException();
     }
 }

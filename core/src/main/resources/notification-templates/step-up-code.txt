@@ -1,0 +1,7 @@
+Sayın kullanıcımız,
+
+Bordro modülüne erişim için doğrulama kodunuz: {{kod}}
+
+Bu kod 5 dakika içinde geçerliliğini yitirecektir.
+
+Dijital İK Platformu

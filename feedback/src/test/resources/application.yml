@@ -1,0 +1,14 @@
+# US-09.3.1: core.notification.EmailNotificationService core modülünde yaşıyor ve
+# core'a bağımlı OLAN HER modülün izole test bağlamına component-scan ile dahil
+# oluyor — bu bean bir JavaMailSender bekliyor, Spring Boot'un mail auto-configuration'ı
+# ise yalnızca spring.mail.host tanımlıysa bu bean'i oluşturuyor. Bu ayar yalnızca
+# bean'in var olmasını sağlamak için (test gerçek bir SMTP sunucusuna bağlanmaya
+# çalışmaz) — leave/src/test/resources/application.yml'deki (US-04.3.1) AYNI ayar.
+spring:
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail:
+    from-address: noreply@dijitalik.local

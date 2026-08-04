@@ -2812,3 +2812,40 @@ docker compose down
 ---
 
 **Modül birleştirme turu tamamlandı: 17 → 14 modül** (`survey`+`suggestion`→`feedback`, `club`+`appointment`→`amenities`, `document`→`organization`). Toplam test sayısı (425) ve tüm davranışlar DEĞİŞMEDEN korundu — bu üç birleşme SALT yapısal/organizasyonel refactor'lerdi, roadmap'in kapsadığı hiçbir kabul kriterine dokunmadı.
+
+---
+
+## Bölüm 9 başlıyor — Kurumsal Entegrasyonlar ve Altyapı
+
+Bölüm 1-8 tamamlandıktan sonra Bölüm 9'un (EPIC-09, 19 User Story) kapsamı kullanıcıyla netleştirildi: gerçek bir kurumsal servis satın alınmasını gerektiren maddeler (AD/LDAP, SSO, gerçek e-Devlet/SGK entegrasyonu, mevcut bordro sisteminden veri taşıma) atlanıyor; kullanıcı onaylamadığı için audit log immutability (kısıtlı DB rolü) ve CI/CD SAST/SCA da atlanıyor. Geri kalan 10 madde (TOTP MFA, onay zinciri motoru, merkezi bildirim, merkezi export, dinamik özel alan çerçevesi, genel dosya saklama, ClamAV virüs tarama, banka ödeme dosyası, hassas alan şifreleme, zamanlanmış DB yedeği) uygulanacak. Ayrıntılı kapsam/tasarım kararları `/Users/ardag/.claude/plans/zesty-sleeping-reef.md`'de. Yeni bir `platform` modülü (yalnızca `core`'a bağımlı) açılacak — onay motoru, dinamik alan çerçevesi, dosya saklama ve virüs tarama gibi "iş mantığı içeren ama tek bir business modülüne ait olmayan" yetenekleri barındıracak (4 ayrı küçük modül yerine, geçen turda düzelttiğimiz "çok modül" sorununu tekrarlamamak için).
+
+## US-09.3.1 — Merkezi bildirim/şablon altyapısı
+
+**Özet:** `leave.LeaveNotificationService` (US-04.3.1) ve `auth.StepUpNotificationService` (US-08D.1.4) — projedeki TEK iki e-posta gönderim implementasyonu — artık `core.notification` paketindeki ortak bir mekanizmaya delege ediyor. Kabul kriteri: "Şablonlar versiyonlanabilir; mevcut bildirimler bozulmadan taşınır."
+
+**Tasarım kararları:**
+- **Ağır bir template engine (Thymeleaf/FreeMarker) BİLİNÇLİ OLARAK kullanılmadı** — toplamda yalnızca 3 şablon (leave-decision-approved/rejected, step-up-code) olduğundan, basit `{{alan}}` yer-tutucu değişimi (`String.replace` döngüsü) yeterli; tam bir motor bu ölçekte aşırı mühendislik olurdu.
+- **Şablonlar dosya olarak** (`core/src/main/resources/notification-templates/*.txt`) tutuluyor — kabul kriterinin "versiyonlanabilir" şartı, git'in kendisiyle karşılanıyor; bir admin ekranından düzenlenebilir DB-tabanlı versiyonlama İSTENMEDİ (ne böyle bir ekran var, ne de kabul kriteri bunu açıkça istiyor).
+- **`LeaveNotificationService`/`StepUpNotificationService` SİLİNMEDİ, İNCE SARMALAYICIYA dönüştürüldü** — public API'leri (`sendDecisionNotification`/`sendStepUpCode`) ve çağıranları (`LeaveRequestService`/`AuthService`) HİÇ değişmedi; yalnızca mesaj metnini artık Java string literal yerine `core.notification.EmailNotificationService`'e delege ediyorlar. Bu, kabul kriterinin "mevcut bildirimler bozulmadan taşınır" şartının doğrudan karşılanması.
+- **`core`, projedeki İLK mail bağımlılığını kazandı** (`spring-boot-starter-mail`) — saf SMTP gönderim ALTYAPISI olduğundan (iş mantığı İÇERMEDİĞİNDEN) core'un kendi ADR'sine ("yalnızca paylaşılan altyapı") aykırı değil; `core.approval.ApprovalStatus`'un core'da yaşamasıyla AYNI gerekçe.
+- **Yan etki — projedeki HER modülün izole test bağlamı artık mail config gerektiriyor:** `core.notification.EmailNotificationService`, `core`'a bağımlı OLAN HER modülün `<Modül>TestApplication`'ı tarafından component-scan ile taranıyor (hepsi `com.digitalik.core`'u tarıyor) ve bir `JavaMailSender` bean'i bekliyor; Spring Boot'un mail auto-configuration'ı ise yalnızca `spring.mail.host` tanımlıysa bu bean'i oluşturuyor. Bu nedenle daha önce hiç mail'e ihtiyacı olmayan 9 modülün (`organization`, `recruitment`, `performance`, `attendance`, `training`, `travel`, `discipline`, `feedback`, `amenities`) HER BİRİNE `leave`/`auth`'un ZATEN sahip olduğu AYNI test-only `spring.mail.host`/`app.mail.from-address` ayarı eklendi — beklenmeyen ama zararsız bir kapsam genişlemesi, canlı davranışı etkilemiyor (yalnızca test bağlamı bean çözümlemesi).
+- **Test stratejisi değişikliği:** `LeaveNotificationServiceTest`/`StepUpNotificationServiceTest`, artık somut `EmailNotificationService` sınıfını MOCK'LAMIYOR — bu ortamda Mockito'nun somut sınıf mock'lamasını (`net.bytebuddy` inline mock maker) desteklemeyen bir **Java 24/ByteBuddy sürüm uyumsuzluğuna** takılıyor ("Java 24 (68) is not supported... officially supports Java 23"). Bunun yerine GERÇEK bir `EmailNotificationService` (mock `JavaMailSender` + gerçek `NotificationTemplateService` ile) kullanılıyor — hem bu ortam sorununu aşıyor hem de daha güçlü bir doğrulama sağlıyor (gerçek render edilmiş metin kontrol ediliyor, yalnızca mock çağrısı değil). SMTP-hatası-yutma testi artık yalnızca `core.notification.EmailNotificationServiceTest`'te (tek merkezi yerde) var, iki modülde tekrar edilmiyor.
+
+**Değişen/eklenen dosyalar:**
+- `core/pom.xml` — `spring-boot-starter-mail` eklendi
+- `core/src/main/java/com/digitalik/core/notification/NotificationTemplateService.java`, `EmailNotificationService.java` (yeni)
+- `core/src/main/resources/notification-templates/leave-decision-approved.txt`, `leave-decision-rejected.txt`, `step-up-code.txt` (yeni)
+- `leave/src/main/java/com/digitalik/leave/service/LeaveNotificationService.java`, `auth/src/main/java/com/digitalik/auth/service/StepUpNotificationService.java` — ince sarmalayıcıya dönüştürüldü
+- `leave/src/test/.../LeaveNotificationServiceTest.java`, `auth/src/test/.../StepUpNotificationServiceTest.java` — gerçek `EmailNotificationService` kullanacak şekilde yeniden yazıldı
+- `core/src/test/java/com/digitalik/core/notification/NotificationTemplateServiceTest.java`, `EmailNotificationServiceTest.java` (yeni, 4+3 test)
+- `organization/src/test/resources/application.yml` (+8 diğer modül) — mail test config (yeni)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı (yeni migration YOK). İzin talebi oluşturulup onaylandı → Mailpit'te "İzin Talebiniz Onaylandı" e-postası, gövdesi `{{donem}}` yer tutucusunun doğru değerle (2026-09-01 - 2026-09-03) değiştirildiğini doğruladı; bordro erişim kodu istendi → Mailpit'te "Bordro Modülü Doğrulama Kodu" e-postası göründü. Her iki e-posta da eskisiyle BİREBİR aynı metni üretti (şablon dosyalarının Türkçe metinleri, orijinal Java string literal'larının birebir kopyası). Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (18), auth (28), organization (73), leave (51), recruitment (39), performance (44), attendance (28), training (22), travel (18), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 430 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

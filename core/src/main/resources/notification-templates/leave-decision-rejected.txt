@@ -1,0 +1,6 @@
+Sayın çalışanımız,
+
+{{donem}} tarihleri arasındaki izin talebiniz REDDEDİLMİŞTİR.
+Gerekçe: {{gerekce}}
+
+Dijital İK Platformu
