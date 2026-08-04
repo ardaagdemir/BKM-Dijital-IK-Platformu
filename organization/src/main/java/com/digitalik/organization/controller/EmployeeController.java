@@ -7,12 +7,16 @@ import com.digitalik.organization.dto.EmployeeProfileResponse;
 import com.digitalik.organization.dto.EmployeeResponse;
 import com.digitalik.organization.entity.Employee;
 import com.digitalik.organization.entity.EmployeeProfile;
+import com.digitalik.organization.service.EmployeeExportService;
 import com.digitalik.organization.service.EmployeeProfileService;
 import com.digitalik.organization.service.EmployeeService;
+import java.nio.charset.StandardCharsets;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,10 +53,15 @@ public class EmployeeController {
 
     private final EmployeeService employeeService;
     private final EmployeeProfileService employeeProfileService;
+    private final EmployeeExportService employeeExportService;
 
-    public EmployeeController(EmployeeService employeeService, EmployeeProfileService employeeProfileService) {
+    public EmployeeController(
+            EmployeeService employeeService,
+            EmployeeProfileService employeeProfileService,
+            EmployeeExportService employeeExportService) {
         this.employeeService = employeeService;
         this.employeeProfileService = employeeProfileService;
+        this.employeeExportService = employeeExportService;
     }
 
     @PostMapping
@@ -88,6 +97,28 @@ public class EmployeeController {
             @RequestParam(required = false) Long jobTitleId,
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
         return employeeService.search(name, organizationUnitId, jobTitleId, pageable).map(EmployeeController::toResponse);
+    }
+
+    /** US-09.4.1: {@code search}'teki AYNI filtrelerle, sayfalanmamış TÜM sonucu CSV/Excel olarak dışa aktarır. */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Long organizationUnitId,
+            @RequestParam(required = false) Long jobTitleId,
+            @RequestParam(defaultValue = "csv") String format) {
+        if ("xlsx".equalsIgnoreCase(format)) {
+            byte[] xlsx = employeeExportService.exportToExcel(name, organizationUnitId, jobTitleId);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"calisanlar.xlsx\"")
+                    .body(xlsx);
+        }
+        String csv = employeeExportService.exportToCsv(name, organizationUnitId, jobTitleId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"calisanlar.csv\"")
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     @PutMapping("/{id}/profile")

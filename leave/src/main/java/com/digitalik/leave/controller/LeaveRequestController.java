@@ -5,11 +5,15 @@ import com.digitalik.leave.dto.LeaveRequestDecisionRequest;
 import com.digitalik.leave.dto.LeaveRequestResponse;
 import com.digitalik.leave.entity.LeaveRequest;
 import com.digitalik.leave.entity.LeaveRequestStatus;
+import com.digitalik.leave.service.LeaveRequestExportService;
 import com.digitalik.leave.service.LeaveRequestService;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,9 +55,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class LeaveRequestController {
 
     private final LeaveRequestService leaveRequestService;
+    private final LeaveRequestExportService leaveRequestExportService;
 
-    public LeaveRequestController(LeaveRequestService leaveRequestService) {
+    public LeaveRequestController(
+            LeaveRequestService leaveRequestService, LeaveRequestExportService leaveRequestExportService) {
         this.leaveRequestService = leaveRequestService;
+        this.leaveRequestExportService = leaveRequestExportService;
     }
 
     @PostMapping
@@ -88,6 +95,25 @@ public class LeaveRequestController {
         return leaveRequestService.listByEmployee(employeeId).stream()
                 .map(leaveRequest -> toResponse(leaveRequest, leaveRequest.getRequestedDays(), null))
                 .toList();
+    }
+
+    /** US-09.4.1: {@code list}'teki AYNI filtreyle, izin geçmişini CSV/Excel olarak dışa aktarır. */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(required = false) Long employeeId, @RequestParam(defaultValue = "csv") String format) {
+        if ("xlsx".equalsIgnoreCase(format)) {
+            byte[] xlsx = leaveRequestExportService.exportToExcel(employeeId);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"izin-gecmisi.xlsx\"")
+                    .body(xlsx);
+        }
+        String csv = leaveRequestExportService.exportToCsv(employeeId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"izin-gecmisi.csv\"")
+                .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 
     private static LeaveRequestStatus parseDecision(String decision) {

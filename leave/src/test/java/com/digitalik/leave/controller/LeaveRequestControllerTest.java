@@ -1,8 +1,10 @@
 package com.digitalik.leave.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +12,7 @@ import com.digitalik.leave.dto.CreateLeaveRequestRequest;
 import com.digitalik.leave.dto.LeaveRequestDecisionRequest;
 import com.digitalik.leave.dto.LeaveTypeRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -285,6 +288,36 @@ class LeaveRequestControllerTest {
         mockMvc.perform(get("/api/leave/requests"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Çalışan boş olamaz."));
+    }
+
+    /** US-09.4.1 kabul kriteri: "Bileşen, en az iki modülde yeniden kullanılır." */
+    @Test
+    void izinGecmisiCsvOlarakDisaAktarilir() throws Exception {
+        Long leaveTypeId = izinTuruOlustur("Yıllık İzin", "YILLIK");
+        izinTalebiOlustur(leaveTypeId, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7));
+
+        MvcResult result = mockMvc.perform(get("/api/leave/requests/export").param("employeeId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "text/csv;charset=UTF-8"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"izin-gecmisi.csv\""))
+                .andReturn();
+
+        String csv = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(csv)
+                .startsWith("id,calisan_id,izin_turu_id,baslangic,bitis,durum,talep_edilen_gun,ret_gerekcesi")
+                .contains("PENDING");
+    }
+
+    @Test
+    void izinGecmisiExcelOlarakDisaAktarilir() throws Exception {
+        Long leaveTypeId = izinTuruOlustur("Yıllık İzin", "YILLIK");
+        izinTalebiOlustur(leaveTypeId, LocalDate.of(2026, 8, 3), LocalDate.of(2026, 8, 7));
+
+        mockMvc.perform(get("/api/leave/requests/export").param("employeeId", "1").param("format", "xlsx"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"izin-gecmisi.xlsx\""));
     }
 
     private Long izinTalebiOlustur(Long leaveTypeId, LocalDate startDate, LocalDate endDate) throws Exception {

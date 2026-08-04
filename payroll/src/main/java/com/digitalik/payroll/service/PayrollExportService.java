@@ -1,8 +1,12 @@
 package com.digitalik.payroll.service;
 
 import com.digitalik.attendance.service.TimesheetService;
+import com.digitalik.core.export.CsvExporter;
 import com.digitalik.leave.entity.LeaveRequest;
 import com.digitalik.travel.entity.ExpenseItem;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,21 +15,22 @@ import org.springframework.stereotype.Service;
  * Kabul kriteri: "Dosya, dış bordro sistemine aktarılabilir formatta
  * üretilir."
  *
- * <p><b>CSV seçildi, Excel DEĞİL</b> — FR-1113 "Excel/CSV/API/dosya
- * bazlı/PDF" zenginliğinin en basit, hiçbir yeni kütüphane bağımlılığı
- * (ör. Apache POI) gerektirmeyen üyesi; CSV zaten evrensel olarak "dış
- * sisteme aktarılabilir" kabul edilir ve kabul kriteri belirli bir format
- * İSTEMİYOR.
- *
  * <p>Sütunlar BİLİNÇLİ OLARAK ham/sayısal ({@code deger} + ayrı {@code
  * birim}) tutuldu — "540 dk" gibi birleşik metin yerine {@code 540} +
  * {@code dakika}, dış sistemin alanı doğrudan sayısal olarak
  * işleyebilmesi için.
+ *
+ * <p>US-09.4.1: CSV üretimi artık {@code core.export.CsvExporter}'ı
+ * kullanıyor (bu servisin eskiden kendi hand-rolled StringBuilder'ının
+ * genelleştirildiği bileşen) — üç heterojen kayıt türü (izin/puantaj/masraf)
+ * ortak {@code String[]} satır temsiline düzleştirilip TEK bir dışa
+ * aktarma çağrısına veriliyor. Dış davranış (endpoint, dosya içeriği)
+ * DEĞİŞMEDİ.
  */
 @Service
 public class PayrollExportService {
 
-    private static final String HEADER = "kayit_turu,tarih,aciklama,deger,birim";
+    private static final String[] HEADER = {"kayit_turu", "tarih", "aciklama", "deger", "birim"};
 
     private final PayrollConsolidationService payrollConsolidationService;
 
@@ -37,36 +42,34 @@ public class PayrollExportService {
         PayrollConsolidationService.Consolidation consolidation =
                 payrollConsolidationService.consolidate(employeeId, year, month);
 
-        StringBuilder csv = new StringBuilder(HEADER).append('\n');
+        List<String[]> rows = new ArrayList<>();
 
         for (LeaveRequest request : consolidation.approvedLeaveRequests()) {
-            csv.append("IZIN,")
-                    .append(request.getStartDate())
-                    .append(",Onayli izin (bitis: ")
-                    .append(request.getEndDate())
-                    .append("),")
-                    .append(request.getRequestedDays())
-                    .append(",gun\n");
+            rows.add(new String[] {
+                "IZIN",
+                String.valueOf(request.getStartDate()),
+                "Onayli izin (bitis: " + request.getEndDate() + ")",
+                String.valueOf(request.getRequestedDays()),
+                "gun"
+            });
         }
 
         for (TimesheetService.Day day : consolidation.timesheet()) {
-            csv.append("PUANTAJ,")
-                    .append(day.date())
-                    .append(',')
-                    .append(day.status())
-                    .append(',')
-                    .append(day.workedMinutes() == null ? 0 : day.workedMinutes())
-                    .append(",dakika\n");
+            rows.add(new String[] {
+                "PUANTAJ",
+                String.valueOf(day.date()),
+                String.valueOf(day.status()),
+                String.valueOf(day.workedMinutes() == null ? 0 : day.workedMinutes()),
+                "dakika"
+            });
         }
 
         for (ExpenseItem item : consolidation.approvedExpenseItems()) {
-            csv.append("MASRAF,,Seyahat talebi #")
-                    .append(item.getTravelRequestId())
-                    .append(',')
-                    .append(item.getAmount())
-                    .append(",TL\n");
+            rows.add(new String[] {
+                "MASRAF", "", "Seyahat talebi #" + item.getTravelRequestId(), String.valueOf(item.getAmount()), "TL"
+            });
         }
 
-        return csv.toString();
+        return CsvExporter.export(HEADER, rows, Function.identity());
     }
 }

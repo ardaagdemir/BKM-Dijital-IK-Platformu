@@ -34,6 +34,14 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
+        <!-- US-09.4.1: Merkezi dışa aktarma bileşeni (core.export) — Excel (XLSX)
+             üretimi için. Ücretsiz/açık kaynak, harici bir servis DEĞİL. -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

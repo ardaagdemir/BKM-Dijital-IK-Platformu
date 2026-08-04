@@ -2849,3 +2849,34 @@ docker compose down -v
 docker compose up --build -d
 docker compose down
 ```
+
+---
+
+## US-09.4.1 — Merkezi filtre + dışa aktarma bileşeni
+
+**Özet:** `core.export` paketi (`CsvExporter` + `ExcelExporter`) — `payroll.PayrollExportService`'teki (US-08D.1.3) hand-rolled CSV üretiminin genelleştirilmiş hali. Kabul kriteri: "Bileşen, en az iki modülde (ör. Çalışan listesi, İzin geçmişi) yeniden kullanılır." Roadmap'in KENDİ örneği birebir uygulandı: `organization` (yeni `GET /api/organization/employees/export`) ve `leave` (yeni `GET /api/leave/requests/export`), ARTI `payroll`'un mevcut export'u da bu bileşeni kullanacak şekilde refactor edildi (3. tüketici).
+
+**Tasarım kararları:**
+- **Filtreleme (`Specification<T>`) GENELLEŞTİRİLMEDİ, yalnızca CSV/Excel YAZMA kısmı merkezi** — `Specification` modül-özel `Root<T>` tipleri gerektirdiğinden gerçek bir genelleme mümkün değil/anlamsız; `organization.EmployeeSpecifications` deseni olduğu gibi kalıyor, yalnızca sonucun dosyaya dönüştürülmesi `core.export`'a taşındı.
+- **`CsvExporter`, `PayrollExportService`'in AKSİNE RFC 4180 tırnaklama uyguluyor** (virgül/tırnak/satır sonu içeren alanlar çift tırnağa alınır) — o servis kapalı, tek kullanımlık, kontrollü bir veri kümesi için bilinçli olarak tırnaklama YAPMIYORDU; bu bileşen artık projenin GENEL aracı olduğundan (isim/adres/açıklama gibi rastgele metin taşıyabilir) bu ek sağlamlık gerekli.
+- **Gerçek Excel (Apache POI, XLSX) eklendi** — CSV'nin yanında ikinci bir format olarak; `poi-ooxml` ücretsiz/açık kaynak bir Maven bağımlılığı, harici bir servis DEĞİL.
+- **`organization` export'unda `nationalId` (TC Kimlik No) BİLİNÇLİ OLARAK sütunlara DAHİL EDİLMEDİ** — toplu indirilebilir bir kanaldan hassas kimlik verisini gereksiz yere yaymamak için (US-09.9.1'in şifreleyeceği alanlardan biri).
+- **`PayrollExportService`'in refactor'ü dış davranışı DEĞİŞTİRMEDİ** — üç heterojen kayıt türü (izin/puantaj/masraf) ortak `String[]` satır temsiline düzleştirilip `CsvExporter.export(...)`'a veriliyor; mevcut 12 payroll testi (satır formatı, `Content-Disposition` header'ı dahil) HİÇ DEĞİŞTİRİLMEDEN geçti — canlı doğrulamada header satırının ("kayit_turu,tarih,aciklama,deger,birim") eskisiyle birebir aynı olduğu ayrıca teyit edildi.
+
+**Değişen/eklenen dosyalar:**
+- `core/pom.xml` — `org.apache.poi:poi-ooxml` eklendi
+- `core/src/main/java/com/digitalik/core/export/CsvExporter.java`, `ExcelExporter.java` (yeni)
+- `core/src/test/java/com/digitalik/core/export/CsvExporterTest.java` (4 test), `ExcelExporterTest.java` (1 test)
+- `organization/src/main/java/com/digitalik/organization/service/EmployeeExportService.java` (yeni); `EmployeeController.java` — `GET /export` eklendi; `EmployeeControllerTest.java` — 2 yeni test
+- `leave/src/main/java/com/digitalik/leave/service/LeaveRequestExportService.java` (yeni); `LeaveRequestController.java` — `GET /export` eklendi; `LeaveRequestControllerTest.java` — 2 yeni test
+- `payroll/src/main/java/com/digitalik/payroll/service/PayrollExportService.java` — `core.export.CsvExporter` kullanacak şekilde refactor edildi (endpoint/test değişmedi)
+
+**Canlı doğrulama:** `docker compose down -v` + `docker compose up --build -d` İLK DENEMEDE başarıyla tamamlandı (yeni migration YOK). Çalışan oluşturulup `GET /api/organization/employees/export` → gerçek, doğru başlıklı bir CSV; `?format=xlsx` → `file` komutunun "Microsoft OOXML" olarak tanıdığı, gerçekten açılabilir bir XLSX dosyası (3464 bayt) indirildi. İzin talebi oluşturulup `GET /api/leave/requests/export?employeeId=1` → doğru CSV. Bordro step-up 2FA akışı tamamlanıp `GET /api/payroll/consolidation/export` → başlık satırı ("kayit_turu,tarih,aciklama,deger,birim") eskisiyle BİREBİR aynı doğrulandı. Sonra durduruldu.
+
+**Çalıştırma komutları:**
+```bash
+mvn test   # core (23), auth (28), organization (75), leave (53), recruitment (39), performance (44), attendance (28), training (22), travel (18), discipline (24), feedback (32), amenities (40), payroll (12), bootstrap (1) = 439 test, 0 hata
+docker compose down -v
+docker compose up --build -d
+docker compose down
+```

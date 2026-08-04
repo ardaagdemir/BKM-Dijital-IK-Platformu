@@ -1,8 +1,10 @@
 package com.digitalik.organization.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,6 +14,7 @@ import com.digitalik.organization.dto.CreateOrganizationUnitRequest;
 import com.digitalik.organization.dto.EmployeeProfileRequest;
 import com.digitalik.organization.dto.JobTitleRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -416,6 +419,34 @@ class EmployeeControllerTest {
         mockMvc.perform(get("/api/organization/employees/" + employeeId + "/profile"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Özlük bilgisi bulunamadı"));
+    }
+
+    /** US-09.4.1 kabul kriteri: "Bileşen, en az iki modülde yeniden kullanılır." */
+    @Test
+    void calisanListesiCsvOlarakDisaAktarilir() throws Exception {
+        calisanOlustur("Zeynep", "Kaya", GECERLI_TC_NO);
+
+        MvcResult result = mockMvc.perform(get("/api/organization/employees/export"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "text/csv;charset=UTF-8"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"calisanlar.csv\""))
+                .andReturn();
+
+        String csv = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertThat(csv)
+                .startsWith("id,ad,soyad,eposta,ise_baslama_tarihi,organizasyon_birimi_id,unvan_id")
+                .contains("Zeynep,Kaya,zeynep@dijitalik.local");
+    }
+
+    @Test
+    void calisanListesiExcelOlarakDisaAktarilir() throws Exception {
+        calisanOlustur("Emre", "Demir", GECERLI_TC_NO);
+
+        mockMvc.perform(get("/api/organization/employees/export").param("format", "xlsx"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"calisanlar.xlsx\""));
     }
 
     private Long calisanOlustur() throws Exception {
