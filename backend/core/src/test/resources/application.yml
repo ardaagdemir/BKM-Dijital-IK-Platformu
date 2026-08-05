@@ -1,0 +1,22 @@
+# Bölüm 13.8: AuditLogControllerTest, bu modülün İLK tam @SpringBootTest'i
+# (öncekiler @DataJpaTest/@WebMvcTest gibi izole slice testlerdi) — tam
+# context yüklenince core.notification.EmailNotificationService bir
+# JavaMailSender bekliyor, Spring Boot'un mail auto-configuration'ı ise
+# yalnızca spring.mail.host tanımlıysa bu bean'i oluşturuyor. Bu ayar
+# yalnızca bean'in var olmasını sağlamak için (test gerçek bir SMTP
+# sunucusuna bağlanmaya çalışmaz) — organization/src/test/resources/
+# application.yml'deki AYNI ayar.
+spring:
+  mail:
+    host: localhost
+    port: 1025
+
+app:
+  mail:
+    from-address: noreply@dijitalik.local
+
+  security:
+    # core.security.EncryptedStringConverter de bu context'e dahil —
+    # @Value("${app.security.encryption-key}") olmadan bean oluşturulamaz.
+    # Gerçek bir anahtar DEĞİL, yalnızca test amaçlı.
+    encryption-key: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=

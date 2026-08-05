@@ -184,4 +184,33 @@ class DisciplinaryCaseControllerTest {
         assertThat(rootRow.getDefense()).isNull();
         assertThat(rootRow.getCaseId()).isNull();
     }
+
+    /** Bölüm 14.7/8C: revizyon geçmişi ucu — en yeni revizyon İLK sırada, üç revizyon da (aç/savunma/kapat) DÖNER. */
+    @Test
+    void revizyonGecmisiEnYeniOnceDoner() throws Exception {
+        Long id = createCase(88L, "İş güvenliği ihlali");
+        mockMvc.perform(put("/api/discipline/cases/{id}/defense", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RecordDefenseRequest("Olayı reddediyorum."))))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/discipline/cases/{id}/close", id)).andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/discipline/cases/{id}/revisions", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].status").value("CLOSED"))
+                .andExpect(jsonPath("$[0].defense").value("Olayı reddediyorum."))
+                .andExpect(jsonPath("$[1].status").value("OPEN"))
+                .andExpect(jsonPath("$[1].defense").value("Olayı reddediyorum."))
+                .andExpect(jsonPath("$[2].status").value("OPEN"))
+                .andExpect(jsonPath("$[2].defense").doesNotExist())
+                .andExpect(jsonPath("$[2].id").value(id));
+    }
+
+    @Test
+    void olmayanBirSurecinRevizyonlariIstenemezVe404Doner() throws Exception {
+        mockMvc.perform(get("/api/discipline/cases/{id}/revisions", 999999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Ceza süreci bulunamadı."));
+    }
 }

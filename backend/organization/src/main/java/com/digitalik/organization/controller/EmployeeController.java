@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,6 +83,17 @@ public class EmployeeController {
     @PreAuthorize("hasAnyRole('ADMIN', 'IK') or @employeeAccessGuard.isSelf(#id, authentication)")
     public EmployeeResponse getById(@PathVariable Long id) {
         return toResponse(employeeService.getById(id));
+    }
+
+    /**
+     * Bölüm 14.3'ün ön-koşulu: oturum sahibinin KENDİ çalışan kaydı —
+     * {@code /api/auth/me} ile AYNI desen, rol kısıtı YOK (zaten tanım
+     * gereği "kendi" kaydı). "/{id}" ile ÇAKIŞMAZ: Spring, sabit segmentli
+     * "/me"yi "{id}" değişken deseninden DAHA SPESİFİK kabul eder.
+     */
+    @GetMapping("/me")
+    public EmployeeResponse getMyEmployee(Authentication authentication) {
+        return toResponse(employeeService.getByEmail(authentication.getName()));
     }
 
     @PutMapping("/{id}")

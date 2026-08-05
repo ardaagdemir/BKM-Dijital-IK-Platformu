@@ -1,4 +1,5 @@
 import { HttpResponse, http } from 'msw'
+import type { UserSummary } from '../../../src/modules/auth/types'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -48,6 +49,13 @@ export const authHandlers = {
     HttpResponse.json(profileOf('calisan@dijitalik.local', 'Ayşe Yılmaz', ['CALISAN'])),
   ),
 
+  // Bölüm 14.4 — `LeaveApprovalsPage.test.tsx`'teki (14.3) tek seferlik
+  // inline override'ın İKİNCİ gerçek ihtiyaçta (`HiringRequestsPage.test.tsx`)
+  // paylaşılan hale getirilmiş hali (bkz. Bölüm 9: "ilk gerçek tekrarında").
+  meYonetici: http.get(`${BASE_URL}/api/auth/me`, () =>
+    HttpResponse.json(profileOf('yonetici@dijitalik.local', 'Bir Yönetici', ['YONETICI'])),
+  ),
+
   meUnauthorized: http.get(`${BASE_URL}/api/auth/me`, () =>
     HttpResponse.json(
       {
@@ -64,3 +72,37 @@ export const authHandlers = {
 }
 
 export const handlers = [authHandlers.loginSuccess, authHandlers.meAdmin, authHandlers.logoutSuccess]
+
+// Bölüm 14.1 — organization.ts'teki createOrganizationHandlers'la AYNI
+// desen: her testin kendi izole (mutasyona AÇIK) kullanıcı+rol senaryosunu
+// kurabilmesi için bir FABRİKA.
+export function createUserManagementHandlers(initialUsers: UserSummary[] = []) {
+  const users = initialUsers.map((user) => ({ ...user, roles: [...user.roles] }))
+
+  return [
+    http.get(`${BASE_URL}/api/auth/users`, () => HttpResponse.json(users)),
+    http.post(`${BASE_URL}/api/auth/users/:userId/roles`, async ({ request, params }) => {
+      const userId = Number(params.userId)
+      const user = users.find((candidate) => candidate.id === userId)
+      if (!user) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Kullanıcı bulunamadı', status: 404, detail: 'Kullanıcı bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      const body = (await request.json()) as { roleCode: string }
+      if (!user.roles.includes(body.roleCode)) {
+        user.roles.push(body.roleCode)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.delete(`${BASE_URL}/api/auth/users/:userId/roles/:roleCode`, ({ params }) => {
+      const userId = Number(params.userId)
+      const user = users.find((candidate) => candidate.id === userId)
+      if (user) {
+        user.roles = user.roles.filter((role) => role !== params.roleCode)
+      }
+      return new HttpResponse(null, { status: 204 })
+    }),
+  ]
+}

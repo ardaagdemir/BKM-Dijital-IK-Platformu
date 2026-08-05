@@ -17,3 +17,16 @@ export type ProfileResponse = {
   fullName: string
   roles: string[]
 }
+
+// Bölüm 14.1 — backend'in UserSummaryResponse'uyla BİREBİR eşleşir (bkz.
+// auth.controller.UserController).
+export type UserSummary = {
+  id: number
+  email: string
+  fullName: string | null
+  roles: string[]
+}
+
+export type AssignRoleRequest = {
+  roleCode: string
+}

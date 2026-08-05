@@ -8,27 +8,23 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../../../shared/api/ApiError'
 import { PageHeader } from '../../../shared/components/PageHeader'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { useCreateEmployee } from '../api/useCreateEmployee'
-import { employeeSchema, type EmployeeFormValues } from '../schema'
+import { FIELD_ERROR_MESSAGES, employeeSchema, type EmployeeFormValues } from '../schema'
 
-// Bölüm 8: backend'in TEK-alanlı hata kısıtı — ProblemDetail.detail hangi
-// ALANLA ilgili olduğunu belirtmez. Backend'in SABİT/bilinen mesaj
-// metinleriyle BİREBİR eşleştirme MÜMKÜN olduğundan burada kullanılır;
-// eşleşme yoksa yalnızca banner gösterilir (GARANTİ olan budur).
-const FIELD_ERROR_MESSAGES: Partial<Record<string, keyof EmployeeFormValues>> = {
-  'Ad boş olamaz.': 'firstName',
-  'Soyad boş olamaz.': 'lastName',
-  'E-posta boş olamaz.': 'email',
-  'İşe giriş tarihi boş olamaz.': 'hireDate',
-  'TC Kimlik No geçersiz.': 'nationalId',
-}
+// Bölüm 14.4 (US-05.4.2): aday→çalışan dönüşümünde `recruitment.CandidateDetailPage`
+// bu sayfaya `location.state`'te bir `EmployeeDraft` (firstName/lastName/email)
+// ile YÖNLENDİRİR — backend `EmployeeDraftResponse`'un TASLAK dediği gibi,
+// `nationalId`/`hireDate` adayda YOK, kullanıcı bunları ELLE tamamlamalı.
+type EmployeeDraftState = { firstName?: string; lastName?: string; email?: string } | null | undefined
 
 export function EmployeeCreatePage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const draft = location.state as EmployeeDraftState
   const { showToast } = useToast()
   const createEmployee = useCreateEmployee()
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -41,7 +37,13 @@ export function EmployeeCreatePage() {
     formState: { errors, isSubmitting },
   } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
-    defaultValues: { firstName: '', lastName: '', nationalId: '', hireDate: '', email: '' },
+    defaultValues: {
+      firstName: draft?.firstName ?? '',
+      lastName: draft?.lastName ?? '',
+      nationalId: '',
+      hireDate: '',
+      email: draft?.email ?? '',
+    },
   })
 
   async function onSubmit(values: EmployeeFormValues) {

@@ -1,5 +1,12 @@
 import { HttpResponse, http } from 'msw'
-import type { Employee, JobTitle, OrganizationUnit } from '../../../src/modules/organization/types'
+import type {
+  Employee,
+  EmployeeAsset,
+  EmployeeAssignmentHistoryEntry,
+  EmployeeProfile,
+  JobTitle,
+  OrganizationUnit,
+} from '../../../src/modules/organization/types'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -10,12 +17,18 @@ export function createOrganizationHandlers(
   initialJobTitles: JobTitle[] = [],
   initialUnits: OrganizationUnit[] = [],
   initialEmployees: Employee[] = [],
+  initialAssets: EmployeeAsset[] = [],
+  initialAssignmentHistory: EmployeeAssignmentHistoryEntry[] = [],
 ) {
   const jobTitles = [...initialJobTitles]
   const units = [...initialUnits]
   const employees = [...initialEmployees]
+  const assets = [...initialAssets]
+  const assignmentHistory = [...initialAssignmentHistory]
+  const profiles = new Map<number, EmployeeProfile>()
   let nextJobTitleId = jobTitles.reduce((max, jt) => Math.max(max, jt.id), 0) + 1
   let nextUnitId = units.reduce((max, unit) => Math.max(max, unit.id), 0) + 1
+  let nextAssetId = assets.reduce((max, asset) => Math.max(max, asset.id), 0) + 1
 
   return [
     http.get(`${BASE_URL}/api/organization/units`, () => HttpResponse.json(units)),
@@ -105,6 +118,170 @@ export function createOrganizationHandlers(
           'Content-Disposition': `attachment; filename="calisanlar.${format}"`,
         },
       })
+    }),
+
+    // Bölüm 14.3'ün ön-koşulu — `/employees/export` ile AYNI gerekçeyle
+    // `/employees/:id`'DEN ÖNCE tanımlanır. Testin "kendisi" olan çalışanı
+    // bilmenin bir yolu olmadığından (mock sunucusu token'dan kimlik
+    // ÇÖZEMEZ), basitleştirilmiş bir kural izlenir: testler "ben" olan TEK
+    // bir çalışanı seed eder, bu handler DİZİDEKİ İLK çalışanı döner.
+    http.get(`${BASE_URL}/api/organization/employees/me`, () => {
+      if (employees.length === 0) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Çalışan bulunamadı', status: 404, detail: 'Çalışan bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      return HttpResponse.json(employees[0])
+    }),
+    // Bölüm 13.7 — `/employees/export`'TAN SONRA tanımlanır: MSW handler'ları
+    // sırayla eşleştirilir, `:id` deseni "export"u da eşleştirebileceğinden
+    // (aynı segment derinliği) daha SPESİFİK olan export handler'ı ÖNCE
+    // gelmelidir.
+    http.get(`${BASE_URL}/api/organization/employees/:id`, ({ params }) => {
+      const id = Number(params.id)
+      const employee = employees.find((candidate) => candidate.id === id)
+      if (!employee) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Çalışan bulunamadı', status: 404, detail: 'Çalışan bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      return HttpResponse.json(employee)
+    }),
+    http.put(`${BASE_URL}/api/organization/employees/:id`, async ({ request, params }) => {
+      const id = Number(params.id)
+      const index = employees.findIndex((employee) => employee.id === id)
+      if (index === -1) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Çalışan bulunamadı', status: 404, detail: 'Çalışan bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      const body = (await request.json()) as Omit<Employee, 'id' | 'organizationUnitId' | 'jobTitleId' | 'iban'>
+      const duplicateNationalId = employees.some(
+        (employee, employeeIndex) => employeeIndex !== index && employee.nationalId === body.nationalId,
+      )
+      if (duplicateNationalId) {
+        return HttpResponse.json(
+          {
+            type: 'about:blank',
+            title: 'Çalışan zaten kayıtlı',
+            status: 409,
+            detail: 'Bu TC Kimlik No ile kayıtlı bir çalışan zaten var.',
+          },
+          { status: 409 },
+        )
+      }
+      employees[index] = { ...employees[index], ...body }
+      return HttpResponse.json(employees[index])
+    }),
+    http.put(`${BASE_URL}/api/organization/employees/:id/assignment`, async ({ request, params }) => {
+      const id = Number(params.id)
+      const index = employees.findIndex((employee) => employee.id === id)
+      if (index === -1) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Çalışan bulunamadı', status: 404, detail: 'Çalışan bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      const body = (await request.json()) as { organizationUnitId: number; jobTitleId: number }
+      employees[index] = {
+        ...employees[index],
+        organizationUnitId: body.organizationUnitId,
+        jobTitleId: body.jobTitleId,
+      }
+      return HttpResponse.json(employees[index])
+    }),
+
+    // Bölüm 14.2 — GET, profil hiç kaydedilmemişse 404 döner (backend'in
+    // GERÇEK davranışı, bkz. EmployeeProfileService); PUT bir UPSERT'tir.
+    http.get(`${BASE_URL}/api/organization/employees/:id/profile`, ({ params }) => {
+      const id = Number(params.id)
+      const profile = profiles.get(id)
+      if (!profile) {
+        return HttpResponse.json(
+          {
+            type: 'about:blank',
+            title: 'Özlük bilgisi bulunamadı',
+            status: 404,
+            detail: 'Özlük bilgisi bulunamadı.',
+          },
+          { status: 404 },
+        )
+      }
+      return HttpResponse.json(profile)
+    }),
+    http.put(`${BASE_URL}/api/organization/employees/:id/profile`, async ({ request, params }) => {
+      const id = Number(params.id)
+      const body = (await request.json()) as Omit<EmployeeProfile, 'employeeId'>
+      const saved: EmployeeProfile = { employeeId: id, ...body }
+      profiles.set(id, saved)
+      return HttpResponse.json(saved)
+    }),
+
+    // Bölüm 14.2 — dikkat: path değişkeni `employeeId` (bkz. gerçek
+    // EmployeeAssetController).
+    http.get(`${BASE_URL}/api/organization/employees/:employeeId/assets`, ({ params }) => {
+      const employeeId = Number(params.employeeId)
+      const content = assets
+        .filter((asset) => asset.employeeId === employeeId)
+        .sort((a, b) => (a.deliveredAt < b.deliveredAt ? 1 : -1))
+      return HttpResponse.json(content)
+    }),
+    http.post(`${BASE_URL}/api/organization/employees/:employeeId/assets`, async ({ request, params }) => {
+      const employeeId = Number(params.employeeId)
+      const body = (await request.json()) as { itemName: string; deliveredAt: string }
+      if (!body.itemName || !body.itemName.trim()) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Geçersiz istek', status: 400, detail: 'Zimmet kalemi adı boş olamaz.' },
+          { status: 400 },
+        )
+      }
+      const created: EmployeeAsset = {
+        id: nextAssetId++,
+        employeeId,
+        itemName: body.itemName,
+        deliveredAt: body.deliveredAt,
+        returnedAt: null,
+      }
+      assets.push(created)
+      return HttpResponse.json(created, { status: 201 })
+    }),
+    http.put(
+      `${BASE_URL}/api/organization/employees/:employeeId/assets/:assetId/return`,
+      async ({ request, params }) => {
+        const employeeId = Number(params.employeeId)
+        const assetId = Number(params.assetId)
+        const index = assets.findIndex((asset) => asset.id === assetId && asset.employeeId === employeeId)
+        if (index === -1) {
+          return HttpResponse.json(
+            { type: 'about:blank', title: 'Zimmet kaydı bulunamadı', status: 404, detail: 'Zimmet kaydı bulunamadı.' },
+            { status: 404 },
+          )
+        }
+        if (assets[index].returnedAt) {
+          return HttpResponse.json(
+            {
+              type: 'about:blank',
+              title: 'Geçersiz istek',
+              status: 400,
+              detail: 'Bu zimmet kalemi zaten iade edilmiş.',
+            },
+            { status: 400 },
+          )
+        }
+        const body = (await request.json()) as { returnedAt: string }
+        assets[index] = { ...assets[index], returnedAt: body.returnedAt }
+        return HttpResponse.json(assets[index])
+      },
+    ),
+
+    // Bölüm 14.2 — salt-okunur; test verisi zaten startDate DESC (en yeni
+    // önce) verilmeli, backend'in GERÇEK sıralamasını taklit eder.
+    http.get(`${BASE_URL}/api/organization/employees/:employeeId/assignment-history`, ({ params }) => {
+      const employeeId = Number(params.employeeId)
+      return HttpResponse.json(assignmentHistory.filter((entry) => entry.employeeId === employeeId))
     }),
   ]
 }

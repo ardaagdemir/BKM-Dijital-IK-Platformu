@@ -1,10 +1,12 @@
 package com.digitalik.travel.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -130,6 +132,39 @@ class ExpenseItemControllerTest {
                         .param("amount", "0"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Tutar sıfırdan büyük olmalıdır."));
+    }
+
+    /** Bölüm 14.7/8B: belge indirme — bkz. controller'daki 8B notu (yönetici onaylamadan ÖNCE belgeyi görebilmeli). */
+    @Test
+    void belgeIndirilir() throws Exception {
+        Long travelRequestId = seyahatTalebiOlustur();
+        MockMultipartFile document =
+                new MockMultipartFile("document", "fatura.pdf", MediaType.APPLICATION_PDF_VALUE, "fatura-icerigi".getBytes());
+        MvcResult createResult = mockMvc.perform(multipart("/api/travel/requests/" + travelRequestId + "/expense-items")
+                        .file(document)
+                        .param("amount", "150.50"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long expenseItemId =
+                objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asLong();
+
+        MvcResult downloadResult = mockMvc.perform(
+                        get("/api/travel/requests/" + travelRequestId + "/expense-items/" + expenseItemId + "/document"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", MediaType.APPLICATION_PDF_VALUE))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"fatura.pdf\""))
+                .andReturn();
+
+        assertThat(downloadResult.getResponse().getContentAsByteArray()).isEqualTo("fatura-icerigi".getBytes());
+    }
+
+    @Test
+    void olmayanMasrafKalemininBelgesiIndirilemezVe404Doner() throws Exception {
+        Long travelRequestId = seyahatTalebiOlustur();
+
+        mockMvc.perform(get("/api/travel/requests/" + travelRequestId + "/expense-items/999999/document"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Masraf kalemi bulunamadı"));
     }
 
     @Test

@@ -41,13 +41,18 @@ Backend'in `03-product-roadmap.md`'de tanımlı ~90 User Story'sinin her biri, g
 
 | # | Alan / Ekran | Eksik veya belirsiz backend davranışı | Durum | Etkilenen bölüm |
 |---|---|---|---|---|
-| 1 | Audit Kayıtları | Audit log'u listeleyen HİÇBİR REST endpoint yok (`AuditLogRepository` yalnızca `findByEntityTypeAndEntityId` sunuyor, genel/filtrelenebilir bir `GET` ucu yok). | 🚫 **BLOKLU** — ekran geliştirilemez | 13.8 |
+| 1 | Audit Kayıtları | ~~Audit log'u listeleyen HİÇBİR REST endpoint yok~~ | ✅ **ÇÖZÜLDÜ** — `GET /api/core/audit-log` eklendi (bkz. `04-implementation-log.md`), 13.8 tamamlandı | 13.8 |
 | 2 | Organizasyon Birimi — Düzenleme/Silme | `OrganizationUnitController`'da yalnızca `POST /` ve `GET /` var; `PUT`/`DELETE` yok. | 🚫 **BLOKLU** (kısmi — yalnızca düzenleme/silme; oluşturma+listeleme AÇIK) | 13.4 |
 | 3 | Organizasyon Birimi/Unvan/Çalışan — yazma uçları | `POST /units`, `POST/PUT/DELETE /job-titles`, `POST/PUT /employees`, `PUT /employees/{id}/assignment` uçlarında `@PreAuthorize` YOK — herhangi bir oturumlu kullanıcı (rolü ne olursa olsun) çağırabilir. Frontend yalnızca GÖRSEL olarak `ADMIN`/`IK`'ya gösterir, gerçek bir yetkilendirme sınırı DEĞİLDİR. | ⚠️ Bloklayıcı değil — güvenlik açığı olarak backend'e ayrıca bildirilmeli | 13.4, 13.5, 13.7 |
 | 4 | Çalışan Listeleme/Dışa Aktarma | `GET /employees` ve `GET /employees/export` üzerinde rol kısıtı YOK. | ⚠️ Bloklayıcı değil — yalnızca frontend UX filtresiyle sınırlanıyor, backend sınırı yok | 13.6 |
 | 5 | Kulüp Etkinliği Oluşturma | `POST /api/clubs/events`'in yalnızca `KULUP_LIDERI` rolüne kısıtlı olduğu backend kodunda TEYİT EDİLMEDİ (roadmap kabul kriterinden çıkarım). | ❓ Doğrulama gerekli (geliştirme başında backend'den teyit edilecek) | 14.7 (8G) |
 | 6 | Randevu Notu — Yetkili Rol | "Yalnızca yetkili kişiler görebilir" (`US-08H.1.3`) kriterindeki rolün TAM ADI backend kodunda netleştirilmedi. | ❓ Doğrulama gerekli | 14.7 (8H) |
 | 7 | Auth — Token Saklama Modeli | Backend yalnızca opak bearer token döndürüyor (`Set-Cookie`/`HttpOnly` cookie YOK, CSRF koruması YOK). Frontend bu nedenle `localStorage`'ı GEÇİCİ çözüm olarak kullanıyor (bkz. `5.2`). | ⚠️ Bloklayıcı değil — bilinen teknik borç, hedef çözüm backend değişikliği gerektirir | 5.2 |
+| 8 | Kullanıcı-Rol Yönetimi — Kullanıcı Dizini | ~~`UserRoleController` yalnızca ZATEN bilinen bir `userId` üzerinde çalışıyordu, kullanıcıyı BULACAK/LİSTELEYECEK bir uç yoktu~~ | ✅ **ÇÖZÜLDÜ** — `GET /api/auth/users` eklendi (bkz. `04-implementation-log.md`), 14.1 tamamlandı | 14.1 |
+| 9 | İzin Yönetimi — Kendi `employeeId`'ni çözme | ~~`Employee` (organization) ve `User` (auth) arasında FK yok; giriş yapan kullanıcının KENDİ çalışan kaydını çözecek bir uç yoktu~~ | ✅ **ÇÖZÜLDÜ** — `GET /api/organization/employees/me` eklendi (bkz. `04-implementation-log.md`), 14.3 tamamlandı | 14.3 |
+| 10 | İşe Alım — Aday/Talep Listeleme | ~~`CandidateController` ve `HiringRequestController`'ın İKİSİNDE de HİÇBİR `GET` ucu yoktu — yalnızca yazma uçları vardı~~ | ✅ **ÇÖZÜLDÜ** — `GET /candidates`, `GET /candidates/{id}`, `GET /candidates/{id}/cv`, `GET /hiring-requests` eklendi (bkz. `04-implementation-log.md`), 14.4 tamamlandı | 14.4 |
+| 11 | Harcırah/Seyahat/Masraf — Belge İndirme | ~~`ExpenseItemController` yüklenen belgeyi İNDİRECEK hiçbir uç sunmuyordu, yalnızca meta veri dönüyordu~~ | ✅ **ÇÖZÜLDÜ** — `GET /travel/requests/{travelRequestId}/expense-items/{id}/document` eklendi (bkz. `04-implementation-log.md`), 14.7/8B tamamlandı | 14.7 (8B) |
+| 12 | Uyarı/Ceza/Ödül ve Disiplin — Revizyon Geçmişi | ~~`DisciplinaryCaseController`'da bir sürecin TÜM revizyonlarını (savunma/kapatma geçmişi) döndürecek hiçbir uç yoktu, yalnızca güncel durum okunabiliyordu~~ | ✅ **ÇÖZÜLDÜ** — `GET /api/discipline/cases/{id}/revisions` eklendi (bkz. `04-implementation-log.md`), 14.7/8C tamamlandı | 14.7 (8C) |
 
 ---
 

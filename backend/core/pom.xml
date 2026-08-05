@@ -42,6 +42,20 @@
             <version>5.3.0</version>
         </dependency>
 
+        <!-- Bölüm 13.8/9.6: AuditLogController'ın @PreAuthorize'ı için gerekli.
+             organization/pom.xml'deki AYNI gerekçeyle, bilinçli olarak yalnızca
+             spring-security-CORE eklendi — auth modülündeki tam
+             spring-boot-starter-security DEĞİL: core, auth'a bağımlı OLAMAZ
+             (core hiçbir modüle bağımlı değildir kuralı, bkz. ADR-002); yalnızca
+             Spring Security'nin jenerik Authentication/GrantedAuthority API'sini
+             kullanır. @EnableMethodSecurity zaten auth modülündeki
+             SecurityConfig'te (uygulama genelinde tek bir Spring context
+             olduğundan) etkin; core'un kendisi bunu etkinleştirmez. -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

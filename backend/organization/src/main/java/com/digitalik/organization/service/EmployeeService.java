@@ -63,6 +63,19 @@ public class EmployeeService {
         return employeeRepository.findById(id).orElseThrow(EmployeeNotFoundException::new);
     }
 
+    /**
+     * Bölüm 14.3'ün ön-koşulu: {@code leave} modülü (ve diğerleri) her uçta
+     * çıplak bir {@code employeeId} bekliyor, ama frontend'in oturum
+     * sahibinin KENDİ ID'sini bulacağı hiçbir uç yoktu — {@code User} ile
+     * {@code Employee} arasında bir FK bağı da yok (bkz.
+     * {@code EmployeeAccessGuard}'ın AYNI kısıtı). Bu, o boşluğu e-posta
+     * eşleşmesiyle kapatır; kayıt yoksa (ör. çalışan olmayan bir ADMIN
+     * hesabı) 404 NORMAL bir durumdur.
+     */
+    public Employee getByEmail(String email) {
+        return employeeRepository.findByEmailIgnoreCase(email).orElseThrow(EmployeeNotFoundException::new);
+    }
+
     public Employee update(
             Long id, String firstName, String lastName, String nationalId, LocalDate hireDate, String email) {
         Employee employee = employeeRepository.findById(id).orElseThrow(EmployeeNotFoundException::new);

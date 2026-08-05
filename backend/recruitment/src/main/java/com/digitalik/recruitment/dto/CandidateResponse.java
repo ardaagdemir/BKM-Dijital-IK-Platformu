@@ -7,5 +7,6 @@ public record CandidateResponse(
         String email,
         String appliedPosition,
         String cvFileName,
-        String stage) {
+        String stage,
+        boolean converted) {
 }

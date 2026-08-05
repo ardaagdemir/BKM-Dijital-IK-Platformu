@@ -6,6 +6,7 @@ import com.digitalik.recruitment.entity.Candidate;
 import com.digitalik.recruitment.entity.CandidateStage;
 import com.digitalik.recruitment.exception.CandidateNotFoundException;
 import com.digitalik.recruitment.repository.CandidateRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
@@ -57,6 +58,15 @@ public class CandidateService {
 
         return candidateRepository.save(
                 new Candidate(firstName, lastName, email, appliedPosition, cvFileName, cvContentType, cvData));
+    }
+
+    /** Bölüm 14.4: aday listesi (US-05.2.1'in kabul kriterine karşılık gelen okuma ucu — bkz. {@code CandidateController}). */
+    public List<Candidate> getAll() {
+        return candidateRepository.findAllByOrderByIdDesc();
+    }
+
+    public Candidate getById(Long candidateId) {
+        return candidateRepository.findById(candidateId).orElseThrow(CandidateNotFoundException::new);
     }
 
     public Candidate changeStage(Long candidateId, CandidateStage stage) {

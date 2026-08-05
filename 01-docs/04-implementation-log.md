@@ -3221,3 +3221,170 @@ docker compose build backend   # repo kökünden
 docker compose up -d
 docker compose down
 ```
+
+---
+
+## `core.controller.AuditLogController` — audit_log okuma ucu (Bölüm 13.8'in ön-koşulu)
+
+**Özet:** Bir roadmap User Story'si değil, frontend'in dedicated pass'ı (`05-frontend-roadmap.md` Bölüm 13.8 — Audit Kayıtları) çalışırken bulunan bir backend boşluğunu kapatan bir ek — o bölümün kendisi "backend kısıtı — bu ekran ŞU AN geliştirilemez" notuyla BLOKLU işaretlenmişti: `core.entity.AuditLogEntry`/`core.repository.AuditLogRepository` (US-01.3.1'den beri) YAZMA tarafını yapıyordu ama listeleyen/okuyan HİÇBİR uç yoktu. Kullanıcı, frontend geliştirirken ortaya çıkan backend eksikliklerinin de giderilmesini istedi ("ihtiyacın olan servisleri yazabilirsin") — bu, o iznin ilk kullanımı.
+
+**Tasarım kararları:**
+- **`GET /api/core/audit-log?entityType=&performedBy=&from=&to=&page=`** — roadmap'in ÖNERDİĞİ uçla birebir, `organization.EmployeeController#search`/`EmployeeSpecifications` deseniyle (Specification + Pageable) mirror edildi. `AuditLogRepository`'ye `JpaSpecificationExecutor` eklendi, yeni `AuditLogSpecifications` (entityType/entityId eşit, performedBy kısmi/büyük-küçük harf duyarsız, performedAt aralığı) ve `AuditLogService` eklendi.
+- **Yalnızca `ADMIN`** (`@PreAuthorize("hasRole('ADMIN')")`) — roadmap'in kendi notuyla tutarlı: `DENETIM` rolü `auth.entity.Role`'de henüz TANIMLI DEĞİL (dört rol: ADMIN/IK/YONETICI/CALISAN), roadmap bunu zaten "VARSAYILAN bir tahmin" olarak işaretlemişti.
+- **Tarih aralığı `LocalDate` (from/to), sabit dilimde (Europe/Istanbul) günün TAMAMINI kapsayacak şekilde `Instant` aralığına çevrilir** (`to` GÜNÜ dahil, ertesi gün başlangıcı HARİÇ) — `attendance.AttendanceZone`'daki AYNI "OffsetDateTime/Instant sabit dilime çevrilmeli" gerekçesiyle, ama `core` `attendance`'a bağımlı olamayacağından (ADR-002) yerel bir sabit tanımlandı. `to < from` ise `IllegalArgumentException` (→ `core.GlobalExceptionHandler` zaten 400'e çeviriyor, yeni bir `@RestControllerAdvice` GEREKMEDİ).
+- **`core/pom.xml`'e `spring-security-core` eklendi** (`organization/pom.xml`'deki AYNI gerekçe/yorumla) — `@PreAuthorize` için gerekli, tam `spring-boot-starter-security` DEĞİL (core, auth'a bağımlı OLAMAZ).
+- **Keşfedilen ek eksiklik: `core` modülünün İZOLE test bağlamında (`CoreTestApplication`) daha önce HİÇ tam bir `@SpringBootTest` yoktu** (yalnızca `@DataJpaTest`/`@WebMvcTest` slice testleri) — yeni `AuditLogControllerTest` bunu İLK KEZ tetikleyince, `core.notification.EmailNotificationService`'in beklediği `JavaMailSender` bean'i (ve `core.security.EncryptedStringConverter`'ın `app.security.encryption-key`'i) eksik olduğundan context yüklenemedi. `organization/src/test/resources/application.yml`'deki AYNI çözüm (`spring.mail.host=localhost` + test amaçlı bir şifreleme anahtarı) `core/src/test/resources/application.yml` olarak eklendi.
+
+**Değişen/eklenen dosyalar:**
+- `backend/core/src/main/java/com/digitalik/core/repository/AuditLogRepository.java` — `JpaSpecificationExecutor` eklendi
+- `backend/core/src/main/java/com/digitalik/core/repository/AuditLogSpecifications.java` (yeni)
+- `backend/core/src/main/java/com/digitalik/core/dto/AuditLogResponse.java` (yeni)
+- `backend/core/src/main/java/com/digitalik/core/service/AuditLogService.java` (yeni)
+- `backend/core/src/main/java/com/digitalik/core/controller/AuditLogController.java` (yeni — `core` modülünün İLK controller'ı)
+- `backend/core/pom.xml` — `spring-security-core` bağımlılığı
+- `backend/core/src/test/resources/application.yml` (yeni)
+- `backend/core/src/test/java/com/digitalik/core/controller/AuditLogControllerTest.java` (yeni, 7 test)
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl core -am test   # core modülü, 42 test, 0 hata
+mvn test                 # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı: `admin@dijitalik.local` ile giriş → `GET /api/core/audit-log?size=5` → `performedAt` DESC sıralı, gerçek (216 kayıtlık) veriyle 200; `entityType=Employee` filtresi doğru daraltıyor; kimlik doğrulamasız istek → 401; `from` > `to` → 400. `@PreAuthorize`'ın gerçek 401/403 uçtan-uca davranışı bu izole modül test ortamında doğrulanamayacağından (bkz. `EmployeeAccessGuardTest`'teki AYNI not), rol kısıtı YALNIZCA bu canlı Docker doğrulamasıyla teyit edildi (ADMIN dışı bir kullanıcı YOK, bu yüzden 403 senaryosu henüz test EDİLEMEDİ — yalnızca 401/kimlik doğrulamalı-200 doğrulandı).
+
+---
+
+## `auth.controller.UserController` — kullanıcı dizini ucu (Bölüm 14.1'in ön-koşulu)
+
+**Özet:** Yine bir roadmap User Story'si değil, frontend'in Bölüm 14.1'i (Kullanıcı-Rol Yönetimi, `/admin/users/:id/roles`) çalışılırken bulunan bir backend boşluğunu kapatan ek — `AuditLogController`'daki İLE AYNI kategori. `UserRoleController` (`GET/POST/DELETE /api/auth/users/{userId}/roles`) YALNIZCA zaten bilinen bir `userId` üzerinde çalışıyordu; kullanıcıyı BULACAK/LİSTELEYECEK hiçbir uç yoktu — ekran pratikte yalnızca ham bir sayısal ID ile ulaşılabilir olurdu.
+
+**Tasarım kararları:**
+- **`GET /api/auth/users`** (ADMIN-only, `@PreAuthorize("hasRole('ADMIN')")`) — `{id, email, fullName, roles}` düz listesi döner; roller her kullanıcı satırına GÖMÜLÜ (mevcut `UserRoleService.getRoles` tekrar kullanılıyor, N+1 ama kullanıcı sayısı küçük — manuel provizyon, `organization.listUnits/listJobTitles`'daki AYNI "düz liste" gerekçesi).
+- Yeni `auth.controller.UserController` sınıfı (`UserRoleController`'ın `{userId}/roles` taban path'inden AYRI, çünkü Spring bir controller'ın class-level path'ini genişletemez/daraltamaz).
+
+**Değişen/eklenen dosyalar:**
+- `backend/auth/src/main/java/com/digitalik/auth/dto/UserSummaryResponse.java` (yeni)
+- `backend/auth/src/main/java/com/digitalik/auth/controller/UserController.java` (yeni)
+- `backend/auth/src/test/java/com/digitalik/auth/controller/UserControllerTest.java` (yeni, 3 test — `auth` modülü `@EnableMethodSecurity`'nin SAHİBİ olduğundan, `core`/`organization`'ın aksine gerçek 401/403 uçtan-uca BURADA test EDİLEBİLİYOR)
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl auth -am test   # auth modülü, 40 test, 0 hata
+mvn test                 # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı: `GET /api/auth/users` → seed admin'i `roles:["ADMIN"]` ile birlikte 200 döndü; kimlik doğrulamasız istek → 401.
+
+---
+
+## `organization.controller.EmployeeController#getMyEmployee` — `GET /employees/me` (Bölüm 14.3'ün ön-koşulu)
+
+**Özet:** `UserController`/`AuditLogController` İLE AYNI kategori — bir roadmap User Story'si değil, frontend'in 14.3'ü (İzin Yönetimi) çalışılırken bulunan temel bir mimari boşluğu kapatan ek. `Employee` (organization) ve `User` (auth) arasında HİÇBİR FK yok; tek bağlantı e-posta eşleşmesi (13.7'nin `EmployeeAccessGuard.isSelf`'inin ZATEN dayandığı AYNI varsayım). Ama giriş yapmış bir kullanıcının KENDİ `employeeId`'sini çözecek hiçbir uç yoktu — 14.3'ün CALISAN'a yönelik 3 ekranı (bakiye, yeni talep, taleplerim) VE yönetici onay ekranının kendi `organizationUnitId`'sini çözmesi bu olmadan İMKANSIZDI.
+
+**Tasarım kararları:**
+- **`GET /api/organization/employees/{id}`'DEN ÖNCE, `/employees/me` olarak** eklendi (Spring'in path-matching önceliği, sabit segmentli path'i `{id}` path-variable'ından ÖNCE dener — yine de kod okunurluğu için tanım sırası bilinçli olarak `/{id}`'den ÖNCE tutuldu).
+- **404, "eşleşen çalışan kaydı YOK" için** — bir hata durumu değil, sisteme henüz bir `Employee` bağlanmamış bir kullanıcı hesabının (ör. taze bir ADMIN hesabı) GEÇERLİ bir durumu; frontend bunu `retry:false` + özel bir boş-durum mesajıyla ele alıyor.
+- **`Authentication` parametresi nedeniyle modülün İZOLE test bağlamında (`OrganizationTestApplication`) MockMvc/HTTP testi YAZILAMADI** (`AuditLogController`'daki AYNI kısıt, orada da `core`'un izole test context'i güvenlik filtre zincirini içermiyordu) — bunun yerine servis katmanında doğrudan bir test (`EmployeeServiceTest`) yazıldı.
+
+**Değişen/eklenen dosyalar:**
+- `backend/organization/src/main/java/com/digitalik/organization/repository/EmployeeRepository.java` — `findByEmailIgnoreCase`
+- `backend/organization/src/main/java/com/digitalik/organization/service/EmployeeService.java` — `getByEmail` (`EmployeeNotFoundException` fırlatır)
+- `backend/organization/src/main/java/com/digitalik/organization/controller/EmployeeController.java` — `GET /me`
+- `backend/organization/src/test/java/com/digitalik/organization/service/EmployeeServiceTest.java` (yeni, 2 test)
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl organization -am test   # 2 yeni test dahil, 0 hata
+mvn test                         # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı: eşleşen `Employee` yokken 404; e-postası `admin@dijitalik.local` olan bir `Employee` (id=308) oluşturulduktan SONRA 200 + doğru gövde. Bu kayıt, 14.3'ün E2E testlerinin de KENDİ oturumunda kullandığı gerçek veri oldu (admin'in `hireDate`'i 1 yıldan kısa kıdemli olduğundan `entitlementDays=0` — bu da "bakiye yetersiz" E2E senaryosunu ayrıca kurgulamaya gerek KALMADAN doğal olarak sağladı, bkz. `06-frontend-implementation-log.md`'nin 14.3 bölümü).
+
+---
+
+## `recruitment.CandidateController`/`HiringRequestController` — okuma (`GET`) uçları (Bölüm 14.4'ün ön-koşulu)
+
+**Özet:** `UserController`/`AuditLogController`/`EmployeeController#getMyEmployee` İLE AYNI kategori — roadmap User Story'si değil, frontend'in 14.4'ü (İşe Alım) çalışılırken bulunan bir backend boşluğunu kapatan ek. `CandidateController` ve `HiringRequestController`'ın İKİSİNDE de HİÇBİR `GET` ucu yoktu — yalnızca yazma uçları (`POST`/`PUT`) vardı; `/recruitment/candidates`, `/recruitment/candidates/:id` ve `/recruitment/hiring-requests` ekranları backend'de KARŞILIĞI OLMADAN geliştirilemezdi.
+
+**Tasarım kararları:**
+- **`GET /api/recruitment/candidates`, `GET /{id}`, `GET /{id}/cv`** — `@PreAuthorize("hasAnyRole('ADMIN', 'IK')")`. Mevcut `applications`/`stage`/`convert-to-employee` uçlarının AKSİNE (kabul kriterleri rol belirtmiyor, kısıt YOK) bu YENİ uçlar BİLİNÇLİ OLARAK kısıtlı — PII (ad/soyad/e-posta) + ham CV baytı döndüren bir okuma ucu, `core.AuditLogController`'daki AYNI "hassas veri → açıkça kısıtla" gerekçesiyle.
+- **`CandidateResponse`'a `converted` (boolean) alanı eklendi** (`Candidate.isConverted()`'dan türetilir) — frontend'in "Çalışana Dönüştür" butonunu zaten dönüştürülmüş bir aday için devre dışı bırakabilmesi için.
+- **`GET /api/recruitment/hiring-requests`** — rol kısıtı YOK (`leave.LeaveRequestController#list`'teki AYNI gerekçe: ekranın kendisi zaten YONETICI/İK/ADMIN'e açık). Opsiyonel `organizationUnitId` filtresi: verilmezse TÜM talepler (İK'nın organizasyon geneli görünümü), verilirse o birimle sınırlı (YONETICI'nin kendi birimi — `HiringRequestAccessGuard`'ın GÜVEN SINIRI parametresiyle AYNI birim kimliği).
+- **`GET .../cv`'nin `@PreAuthorize` KAPSAMI, bu modülün İZOLE test bağlamında DOĞRULANAMIYOR** (`AuditLogController`/`UserController`'daki AYNI kısıt — `recruitment`'ın izole test context'i method security'yi İÇERMİYOR) — MockMvc testleri yalnızca iş mantığını (200/404/gövde doğruluğu) doğruluyor, rol bazlı 403 davranışı Docker'da curl ile canlı doğrulandı.
+
+**Değişen/eklenen dosyalar:**
+- `backend/recruitment/src/main/java/com/digitalik/recruitment/repository/{CandidateRepository,HiringRequestRepository}.java` — `findAllByOrderByIdDesc`/`findByOrganizationUnitIdOrderByIdDesc`
+- `backend/recruitment/src/main/java/com/digitalik/recruitment/service/{CandidateService,HiringRequestService}.java` — `getAll`/`getById`
+- `backend/recruitment/src/main/java/com/digitalik/recruitment/controller/CandidateController.java` — `GET`, `GET /{id}`, `GET /{id}/cv`
+- `backend/recruitment/src/main/java/com/digitalik/recruitment/controller/HiringRequestController.java` — `GET`
+- `backend/recruitment/src/main/java/com/digitalik/recruitment/dto/CandidateResponse.java` — `converted` alanı
+- `backend/recruitment/src/test/java/com/digitalik/recruitment/controller/{CandidateControllerTest,HiringRequestControllerTest}.java` — +11 yeni test
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl recruitment -am test   # +11 yeni test dahil, 0 hata
+mvn test                        # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile: aday başvurusu (multipart, gerçek bir PDF baytıyla) → `GET /candidates` listede görünüyor → `GET /candidates/{id}` doğru gövde → `GET /candidates/{id}/cv` indirilen baytlar `diff` ile YÜKLENENLERLE BİREBİR eşleşiyor, `Content-Disposition`/`Content-Type` header'ları doğru → kimliksiz istek 401. Norm kadro tanımlama → işe alım talebi oluşturma → `GET /hiring-requests` (filtresiz TÜMÜNÜ, `organizationUnitId` filtresiyle SINIRLI listeyi) doğru döndürdü.
+
+---
+
+## `travel.controller.ExpenseItemController#downloadDocument` — masraf kalemi belgesi indirme ucu (Bölüm 14.7/8B'nin ön-koşulu)
+
+**Özet:** `CandidateController#downloadCv`/`EmployeeController#getMyEmployee` İLE AYNI kategori — roadmap User Story'si değil, frontend'in 8B'si (Harcırah/Seyahat/Masraf) çalışılırken bulunan bir backend boşluğunu kapatan ek. `ExpenseItemController#toResponse`, yüklenen belgenin YALNIZCA meta verisini (`documentFileName`/`documentContentType`, `platform.file.StoredFile`'dan okunarak) döndürüyordu — ham baytları İNDİRECEK hiçbir uç yoktu. Bu, "masraf onayı" ekranının pratik anlamı için kritik bir eksiklikti: onaylayacak yönetici, tutarı GÖRSE de fişi/faturayı HİÇ GÖREMEZDİ.
+
+**Tasarım kararları:**
+- **`GET /{id}/document`** — `ExpenseItemService`'e eklenen basit bir `get(Long id)` üzerinden `ExpenseItem` bulunur, ardından mevcut `getDocument(storedFileId)` ile `StoredFile` okunur ve ham baytlar `Content-Disposition: attachment` ile döndürülür — `CandidateController#downloadCv`'deki (Bölüm 14.4) BİREBİR AYNI desen.
+- **`{travelRequestId}` path parametresi REST iç-içe kaynak yapısı için TUTULDU ama sorguda KULLANILMADI** — bu controller'ın MEVCUT `decide(...)` metodunun ZATEN kurduğu emsalle TUTARLI (o da `travelRequestId`'yi alır ama gövdede kullanmaz); yeni bir çapraz-doğrulama İCAT EDİLMEDİ.
+- **Rol kısıtlaması eklenmedi** — `ExpenseItemController`'ın DİĞER uçlarıyla (create/list/decide) AYNI, kabul kriteri bundan bahsetmiyor.
+
+**Değişen/eklenen dosyalar:**
+- `backend/travel/src/main/java/com/digitalik/travel/controller/ExpenseItemController.java` — `GET /{id}/document`
+- `backend/travel/src/main/java/com/digitalik/travel/service/ExpenseItemService.java` — `get(Long id)`
+- `backend/travel/src/test/java/com/digitalik/travel/controller/ExpenseItemControllerTest.java` — +2 yeni test
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl travel -am test   # +2 yeni test dahil, 9/9 yeşil
+mvn test                   # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile: seyahat talebi oluşturma → masraf kalemi ekleme (multipart, gerçek bir PDF baytıyla) → `GET .../document` indirilen baytlar `diff` ile YÜKLENENLERLE BİREBİR eşleşiyor, `Content-Disposition`/`Content-Type` header'ları doğru → onaylama (APPROVED) doğru çalıştı.
+
+---
+
+## `discipline.controller.DisciplinaryCaseController#getRevisions` — revizyon geçmişi ucu (Bölüm 14.7/8C'nin ön-koşulu)
+
+**Özet:** `ExpenseItemController#downloadDocument` İLE AYNI kategori — roadmap User Story'si değil, frontend'in 8C'si (Uyarı/Ceza/Ödül ve Disiplin) çalışılırken bulunan bir backend boşluğunu kapatan ek. `DisciplinaryCaseService` (SEC-021, US-08C.1.3) her değişiklikte YENİ bir revizyon satırı ekliyor ve `findRevisionsByRootId` repository sorgusu ZATEN vardı — ama BU sorgu yalnızca servisin İÇİNDE (`latestRevision`, "en güncel durumu bul") kullanılıyordu, DIŞARIYA hiç açılmamıştı. Roadmap'in "mevcut kayıt `AccordionList` ile geçmiş revizyonları gösterir" notu bu olmadan KARŞILANAMAZDI.
+
+**Tasarım kararları:**
+- **`GET /{id}/revisions`** — YENİ bir `DisciplinaryCaseRevisionResponse` DTO'su döner; MEVCUT `DisciplinaryCaseResponse`'tan BİLİNÇLİ OLARAK FARKLI: `DisciplinaryCaseResponse.id` HER ZAMAN sürecin KÖK id'sidir (US-08C.1.3'ün "istemci açısından süreç id'si değişmez" kuralı), ama revizyon listesindeki her satırın KENDİ id'si ve `createdAt`'ı gösterilmesi GEREKİR (aksi halde istemci revizyonları AYIRT edemez) — bu yüzden AYRI bir DTO.
+- **`DisciplinaryCaseService.getRevisions(Long caseId)`** — mevcut `findRevisionsByRootId`'yi ÇAĞIRIR, boşsa (süreç yok) `DisciplinaryCaseNotFoundException` fırlatır (`latestRevision`'daki AYNI davranış, kod TEKRARI değil aynı istisna sınıfı).
+
+**Değişen/eklenen dosyalar:**
+- `backend/discipline/src/main/java/com/digitalik/discipline/dto/DisciplinaryCaseRevisionResponse.java` (yeni)
+- `backend/discipline/src/main/java/com/digitalik/discipline/service/DisciplinaryCaseService.java` — `getRevisions(Long id)`
+- `backend/discipline/src/main/java/com/digitalik/discipline/controller/DisciplinaryCaseController.java` — `GET /{id}/revisions`
+- `backend/discipline/src/test/java/com/digitalik/discipline/controller/DisciplinaryCaseControllerTest.java` — +2 yeni test
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl discipline -am test   # +2 yeni test dahil, 12/12 yeşil
+mvn test                       # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile: süreç açma → savunmasız kapatma denemesi 400 (`"Savunma alınmadan ceza süreci tamamlanamaz."`) → savunma kaydetme → kapatma → `GET .../revisions` ÜÇ revizyonu (açılış/savunma/kapatma), EN YENİSİ İLK sırada, doğru döndürdü.

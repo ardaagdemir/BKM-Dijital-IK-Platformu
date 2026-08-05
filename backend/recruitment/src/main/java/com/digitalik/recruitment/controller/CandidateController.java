@@ -7,9 +7,13 @@ import com.digitalik.recruitment.entity.Candidate;
 import com.digitalik.recruitment.entity.CandidateStage;
 import com.digitalik.recruitment.service.CandidateService;
 import java.io.IOException;
+import java.util.List;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -46,6 +50,16 @@ import org.springframework.web.multipart.MultipartFile;
  * {@code Candidate.convertToEmployee()}'deki ayrıntılı not: gerçek
  * {@code organization.Employee} kaydı BURADA OLUŞTURULMAZ, İK kullanıcısı bu
  * taslakla {@code POST /api/organization/employees}'i AYRICA çağırmalı.
+ *
+ * <p><b>Bölüm 14.4 (frontend) sırasında bulunan boşluk:</b> bu sınıfın hiçbir
+ * OKUMA ucu yoktu — {@code /recruitment/candidates} (liste) ve
+ * {@code /recruitment/candidates/:id} (detay) ekranları backend'de KARŞILIĞI
+ * OLMADAN geliştirilemezdi. {@code GET}/{@code GET /{id}}/{@code GET /{id}/cv}
+ * eklendi; roadmap'in bu ekran için rol tablosu ({@code ADMIN}, {@code IK})
+ * açık olduğundan — {@code applications}/{@code stage}/{@code convert-to-employee}'nin
+ * AKSİNE (kabul kriterleri rol belirtmiyor) — bu YENİ uçlara
+ * {@code @PreAuthorize} eklendi (bkz. {@code core.AuditLogController}'daki
+ * aynı gerekçe: PII/CV içeren yeni bir okuma ucu, hassasiyeti nedeniyle).
  */
 @RestController
 @RequestMapping("/api/recruitment/candidates")
@@ -87,6 +101,32 @@ public class CandidateController {
                 candidate.getId(), candidate.getFirstName(), candidate.getLastName(), candidate.getEmail());
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'IK')")
+    public List<CandidateResponse> getAll() {
+        return candidateService.getAll().stream().map(CandidateController::toResponse).toList();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'IK')")
+    public CandidateResponse getById(@PathVariable Long id) {
+        return toResponse(candidateService.getById(id));
+    }
+
+    /** CV, veritabanında ham bayt olarak tutulur (bkz. {@code Candidate} javadoc'u) — burada olduğu gibi indirilir. */
+    @GetMapping("/{id}/cv")
+    @PreAuthorize("hasAnyRole('ADMIN', 'IK')")
+    public ResponseEntity<byte[]> downloadCv(@PathVariable Long id) {
+        Candidate candidate = candidateService.getById(id);
+        String fileName = candidate.getCvFileName().replace("\"", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(candidate.getCvContentType()))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + fileName + "\"")
+                .body(candidate.getCvData());
+    }
+
     private static CandidateStage parseStage(String stage) {
         try {
             return CandidateStage.valueOf(stage);
@@ -104,6 +144,7 @@ public class CandidateController {
                 candidate.getEmail(),
                 candidate.getAppliedPosition(),
                 candidate.getCvFileName(),
-                candidate.getStage().name());
+                candidate.getStage().name(),
+                candidate.isConverted());
     }
 }

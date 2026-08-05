@@ -36,6 +36,11 @@ export function UserMenu() {
     navigate('/login', { replace: true })
   }
 
+  function handleProfileClick() {
+    setAnchorEl(null)
+    navigate('/profile')
+  }
+
   return (
     <>
       <IconButton
@@ -63,7 +68,7 @@ export function UserMenu() {
           </Stack>
         </Box>
         <Divider />
-        <MenuItem disabled>
+        <MenuItem onClick={handleProfileClick}>
           <ListItemIcon>
             <PersonOutlineOutlinedIcon fontSize="small" />
           </ListItemIcon>

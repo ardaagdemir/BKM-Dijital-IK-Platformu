@@ -63,6 +63,11 @@ public class ExpenseItemService {
         return fileStorageService.retrieve(storedFileId);
     }
 
+    /** Bölüm 14.7/8B: belge indirme ucu için — bkz. {@code ExpenseItemController#downloadDocument}. */
+    public ExpenseItem get(Long id) {
+        return expenseItemRepository.findById(id).orElseThrow(ExpenseItemNotFoundException::new);
+    }
+
     public List<ExpenseItem> listByTravelRequest(Long travelRequestId) {
         if (travelRequestId == null) {
             throw new IllegalArgumentException("Seyahat talebi boş olamaz.");

@@ -1,13 +1,20 @@
 import { apiClient } from '../../../shared/api/apiClient'
 import type { PageResponse } from '../../../shared/types/PageResponse'
 import type {
+  AssignEmployeeRequest,
+  CreateEmployeeAssetRequest,
   CreateEmployeeRequest,
   CreateOrganizationUnitRequest,
   Employee,
+  EmployeeAsset,
+  EmployeeAssignmentHistoryEntry,
+  EmployeeProfile,
+  EmployeeProfileRequest,
   EmployeeSearchParams,
   JobTitle,
   JobTitleRequest,
   OrganizationUnit,
+  ReturnEmployeeAssetRequest,
 } from '../types'
 
 function buildEmployeeQuery(params: EmployeeSearchParams): URLSearchParams {
@@ -56,6 +63,27 @@ export function getEmployee(id: number): Promise<Employee> {
   return apiClient.get<Employee>(`/api/organization/employees/${id}`)
 }
 
+// Bölüm 14.3'ün ön-koşulu — oturum sahibinin KENDİ çalışan kaydı (e-posta
+// eşleşmesi, bkz. backend'in EmployeeController#getMyEmployee). Employee ile
+// User arasında bir FK bağı OLMADIĞINDAN bu, "benim employeeId'm nedir?"
+// sorusuna cevap veren TEK yol — izin bakiyesi/talebi gibi ekranlar bunu
+// kullanır. Kayıt yoksa (ör. çalışan olmayan bir hesap) 404 döner.
+export function getMyEmployee(): Promise<Employee> {
+  return apiClient.get<Employee>('/api/organization/employees/me')
+}
+
+// Bölüm 13.7 — yalnızca temel bilgileri günceller (organizationUnitId/
+// jobTitleId/iban'a DOKUNMAZ, bkz. EmployeeService.update).
+export function updateEmployee(id: number, request: CreateEmployeeRequest): Promise<Employee> {
+  return apiClient.put<Employee>(`/api/organization/employees/${id}`, request)
+}
+
+// Atama, temel bilgi güncellemesinden AYRI bir uç (bkz. EmployeeService.assign)
+// — her çağrı önceki atamayı TAMAMEN üzerine yazar (parçalı/kısmi atama YOK).
+export function assignEmployee(id: number, request: AssignEmployeeRequest): Promise<Employee> {
+  return apiClient.put<Employee>(`/api/organization/employees/${id}/assignment`, request)
+}
+
 export function searchEmployees(
   params: EmployeeSearchParams & { page: number; size?: number },
 ): Promise<PageResponse<Employee>> {
@@ -71,4 +99,44 @@ export function exportEmployees(
   const query = buildEmployeeQuery(params)
   query.set('format', params.format)
   return apiClient.getBlob(`/api/organization/employees/export?${query.toString()}`)
+}
+
+// Bölüm 14.2 (US-03.3.1) — PUT bir UPSERT'tir (yoksa oluşturur/varsa
+// günceller, bkz. EmployeeProfileService.save); GET, profil hiç
+// kaydedilmemişse 404 döner ("Özlük bilgisi bulunamadı.").
+export function getEmployeeProfile(id: number): Promise<EmployeeProfile> {
+  return apiClient.get<EmployeeProfile>(`/api/organization/employees/${id}/profile`)
+}
+
+export function saveEmployeeProfile(id: number, request: EmployeeProfileRequest): Promise<EmployeeProfile> {
+  return apiClient.put<EmployeeProfile>(`/api/organization/employees/${id}/profile`, request)
+}
+
+// Bölüm 14.2 (US-03.3.2) — dikkat: path değişkeni `id` DEĞİL `employeeId`
+// (bkz. organization.controller.EmployeeAssetController).
+export function listEmployeeAssets(employeeId: number): Promise<EmployeeAsset[]> {
+  return apiClient.get<EmployeeAsset[]>(`/api/organization/employees/${employeeId}/assets`)
+}
+
+export function createEmployeeAsset(
+  employeeId: number,
+  request: CreateEmployeeAssetRequest,
+): Promise<EmployeeAsset> {
+  return apiClient.post<EmployeeAsset>(`/api/organization/employees/${employeeId}/assets`, request)
+}
+
+export function returnEmployeeAsset(
+  employeeId: number,
+  assetId: number,
+  request: ReturnEmployeeAssetRequest,
+): Promise<EmployeeAsset> {
+  return apiClient.put<EmployeeAsset>(`/api/organization/employees/${employeeId}/assets/${assetId}/return`, request)
+}
+
+// Bölüm 14.2 (US-03.4.1) — salt-okunur, backend ZATEN startDate DESC
+// (en yeni önce) sıralı döner.
+export function listAssignmentHistory(employeeId: number): Promise<EmployeeAssignmentHistoryEntry[]> {
+  return apiClient.get<EmployeeAssignmentHistoryEntry[]>(
+    `/api/organization/employees/${employeeId}/assignment-history`,
+  )
 }

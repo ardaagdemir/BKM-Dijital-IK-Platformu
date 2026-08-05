@@ -75,6 +75,22 @@ public class DisciplinaryCaseService {
     }
 
     /**
+     * Bölüm 14.7/8C (frontend) sırasında bulunan boşluk: {@code
+     * findRevisionsByRootId} yalnızca BU servisin İÇİNDE ({@link
+     * #latestRevision}) kullanılıyordu, DIŞARIYA hiç açılmamıştı — roadmap'in
+     * "mevcut kayıt AccordionList ile geçmiş revizyonları gösterir" notu
+     * bunu GEREKTİRİYOR (bkz. {@code DisciplinaryCaseController#getRevisions}).
+     * En yeni revizyon İLK sırada (bkz. repository sorgusu).
+     */
+    public List<DisciplinaryCase> getRevisions(Long caseId) {
+        List<DisciplinaryCase> revisions = disciplinaryCaseRepository.findRevisionsByRootId(caseId);
+        if (revisions.isEmpty()) {
+            throw new DisciplinaryCaseNotFoundException();
+        }
+        return revisions;
+    }
+
+    /**
      * US-08C.1.3: {@code caseId}, sürecin dışarıya gösterilen KÖK id'sidir
      * (bkz. {@code DisciplinaryCaseController.toResponse}); bu sürece ait
      * tüm revizyonlar arasından en güncel olanı (en yüksek id) döner.

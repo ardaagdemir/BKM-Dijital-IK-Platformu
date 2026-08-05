@@ -1,5 +1,6 @@
 package com.digitalik.recruitment.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -140,6 +141,42 @@ class HiringRequestControllerTest {
                         .content(objectMapper.writeValueAsString(new HiringRequestDecisionRequest("APPROVED"))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("İşe alım talebi bulunamadı"));
+    }
+
+    /** Bölüm 14.4: {@code GET} — {@code organizationUnitId} verilmezse TÜM talepler, verilirse o birimle sınırlı. */
+    @Test
+    void tumTaleplerListelenir() throws Exception {
+        normTanimla(1L, 2L, 5);
+        normTanimla(9L, 2L, 3);
+        talepOlusturBirim(1L, 2L);
+        talepOlusturBirim(9L, 2L);
+
+        mockMvc.perform(get("/api/recruitment/hiring-requests"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void birimeGoreFiltrelenir() throws Exception {
+        normTanimla(1L, 2L, 5);
+        normTanimla(9L, 2L, 3);
+        Long birim1Talep = talepOlusturBirim(1L, 2L);
+        talepOlusturBirim(9L, 2L);
+
+        mockMvc.perform(get("/api/recruitment/hiring-requests").param("organizationUnitId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(birim1Talep));
+    }
+
+    private Long talepOlusturBirim(Long organizationUnitId, Long jobTitleId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/recruitment/hiring-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new CreateHiringRequestRequest(organizationUnitId, jobTitleId))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
     }
 
     private Long talepOlustur() throws Exception {

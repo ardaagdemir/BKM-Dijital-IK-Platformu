@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -27,6 +28,14 @@ import org.springframework.web.bind.annotation.RestController;
  * güven-sınırı notu), sonra {@code PUT /{id}/hr-decision} (yalnızca
  * {@code MANAGER_APPROVED} iken, yalnızca ADMIN/IK — ekip kısıtı yok, İK
  * organizasyon geneli karar verir).
+ *
+ * <p><b>Bölüm 14.4 (frontend) sırasında bulunan boşluk:</b> bu sınıfın hiçbir
+ * OKUMA ucu yoktu — {@code /recruitment/hiring-requests} ekranı backend'de
+ * KARŞILIĞI OLMADAN geliştirilemezdi. {@code GET} eklendi;
+ * {@code leave.LeaveRequestController#list}'teki AYNI desen — rol kısıtı
+ * YOK (ekranın kendisi zaten hem YONETICI hem İK/ADMIN'e açık, hassasiyeti
+ * {@code recruitment.CandidateController}'ın yeni okuma uçlarından FARKLI:
+ * PII/CV içermiyor, yalnızca birim/unvan/durum).
  */
 @RestController
 @RequestMapping("/api/recruitment/hiring-requests")
@@ -59,6 +68,13 @@ public class HiringRequestController {
     public HiringRequestResponse hrDecide(@PathVariable Long id, @RequestBody HiringRequestDecisionRequest request) {
         boolean approve = parseDecision(request.decision());
         return toResponse(hiringRequestService.hrDecide(id, approve));
+    }
+
+    @GetMapping
+    public List<HiringRequestResponse> getAll(@RequestParam(required = false) Long organizationUnitId) {
+        return hiringRequestService.getAll(organizationUnitId).stream()
+                .map(HiringRequestController::toResponse)
+                .toList();
     }
 
     private static boolean parseDecision(String decision) {

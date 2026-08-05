@@ -9,6 +9,7 @@ import com.digitalik.travel.service.ExpenseItemService;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +38,14 @@ import org.springframework.web.multipart.MultipartFile;
  * tekrar kullanımı; kabul kriteri "yalnızca kendi ekibi" gibi bir kayıt
  * bazlı kısıt İSTEMEDİĞİNDEN (leave/training'in decide uçlarının AKSİNE),
  * burada bir {@code @PreAuthorize}/ekip listesi YOK.
+ *
+ * <p><b>Bölüm 14.7/8B (frontend) sırasında bulunan boşluk:</b> yüklenen
+ * belgenin ham baytlarını İNDİRECEK hiçbir uç yoktu — {@code toResponse}
+ * yalnızca meta veriyi ({@code documentFileName}/{@code documentContentType})
+ * döndürüyordu, bu da "onaylayacak yönetici belgeyi HİÇ GÖREMEZ" anlamına
+ * gelirdi. {@code GET /{id}/document} eklendi —
+ * {@code recruitment.CandidateController#downloadCv}'deki (Bölüm 14.4) AYNI
+ * desen.
  */
 @RestController
 @RequestMapping("/api/travel/requests/{travelRequestId}/expense-items")
@@ -68,6 +77,17 @@ public class ExpenseItemController {
         return expenseItemService.listByTravelRequest(travelRequestId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @GetMapping("/{id}/document")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable Long travelRequestId, @PathVariable Long id) {
+        ExpenseItem expenseItem = expenseItemService.get(id);
+        StoredFile document = expenseItemService.getDocument(expenseItem.getStoredFileId());
+        String fileName = document.getFileName().replace("\"", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(document.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(document.getFileData());
     }
 
     @PutMapping("/{id}/decision")

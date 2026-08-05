@@ -2,6 +2,7 @@ package com.digitalik.discipline.controller;
 
 import com.digitalik.discipline.dto.CreateDisciplinaryCaseRequest;
 import com.digitalik.discipline.dto.DisciplinaryCaseResponse;
+import com.digitalik.discipline.dto.DisciplinaryCaseRevisionResponse;
 import com.digitalik.discipline.dto.RecordDefenseRequest;
 import com.digitalik.discipline.entity.DisciplinaryCase;
 import com.digitalik.discipline.service.DisciplinaryCaseService;
@@ -28,6 +29,12 @@ import org.springframework.web.bind.annotation.RestController;
  * yeni bir revizyon satırı eklese de, {@link #toResponse} her zaman {@code
  * rootCaseId()}'i döndürdüğünden istemci açısından "süreç id"si sürecin
  * ömrü boyunca DEĞİŞMEZ.
+ *
+ * <p><b>Bölüm 14.7/8C (frontend) sırasında bulunan boşluk:</b> revizyon
+ * geçmişini (SEC-021'in TÜM revizyonları KORUDUĞU model) DIŞARIYA açan
+ * hiçbir uç yoktu — roadmap'in "mevcut kayıt AccordionList ile geçmiş
+ * revizyonları gösterir" notu KARŞILANAMAZDI. {@code GET /{id}/revisions}
+ * eklendi.
  */
 @RestController
 @RequestMapping("/api/discipline/cases")
@@ -60,6 +67,22 @@ public class DisciplinaryCaseController {
         return disciplinaryCaseService.listByEmployee(employeeId).stream()
                 .map(DisciplinaryCaseController::toResponse)
                 .toList();
+    }
+
+    @GetMapping("/{id}/revisions")
+    public List<DisciplinaryCaseRevisionResponse> getRevisions(@PathVariable Long id) {
+        return disciplinaryCaseService.getRevisions(id).stream()
+                .map(DisciplinaryCaseController::toRevisionResponse)
+                .toList();
+    }
+
+    private static DisciplinaryCaseRevisionResponse toRevisionResponse(DisciplinaryCase disciplinaryCase) {
+        return new DisciplinaryCaseRevisionResponse(
+                disciplinaryCase.getId(),
+                disciplinaryCase.getReason(),
+                disciplinaryCase.getDefense(),
+                disciplinaryCase.getStatus(),
+                disciplinaryCase.getCreatedAt());
     }
 
     private static DisciplinaryCaseResponse toResponse(DisciplinaryCase disciplinaryCase) {

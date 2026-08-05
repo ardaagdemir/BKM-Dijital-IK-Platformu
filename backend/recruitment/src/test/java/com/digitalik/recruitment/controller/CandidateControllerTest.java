@@ -1,10 +1,13 @@
 package com.digitalik.recruitment.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -207,5 +210,65 @@ class CandidateControllerTest {
                         .param("email", "ahmet@ornek.com"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Başvurulan pozisyon boş olamaz."));
+    }
+
+    /**
+     * Bölüm 14.4: {@code GET}/{@code GET /{id}}/{@code GET /{id}/cv} —
+     * {@code @PreAuthorize} bu izole test bağlamında UYGULANMIYOR (bkz. dosya
+     * başındaki genel not) — rol bazlı 403 davranışı Docker'da canlı
+     * doğrulanıyor, burada yalnızca iş mantığı test ediliyor.
+     */
+    @Test
+    void adaylarEnYeniOnceListelenir() throws Exception {
+        Long ilkAday = basvuruOlustur();
+        Long ikinciAday = basvuruOlustur();
+
+        mockMvc.perform(get("/api/recruitment/candidates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(ikinciAday))
+                .andExpect(jsonPath("$[1].id").value(ilkAday));
+    }
+
+    @Test
+    void adayDetayiGetirilir() throws Exception {
+        Long candidateId = basvuruOlustur();
+
+        mockMvc.perform(get("/api/recruitment/candidates/" + candidateId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(candidateId))
+                .andExpect(jsonPath("$.firstName").value("Ahmet"))
+                .andExpect(jsonPath("$.converted").value(false));
+    }
+
+    @Test
+    void donusturulenAdayinDetayindaConvertedTrueDoner() throws Exception {
+        Long candidateId = basvuruOlustur();
+        mockMvc.perform(post("/api/recruitment/candidates/" + candidateId + "/convert-to-employee"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/recruitment/candidates/" + candidateId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.converted").value(true));
+    }
+
+    @Test
+    void olmayanAdayinDetayiGetirilemezVe404Doner() throws Exception {
+        mockMvc.perform(get("/api/recruitment/candidates/999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Aday bulunamadı"));
+    }
+
+    @Test
+    void cvIndirilir() throws Exception {
+        Long candidateId = basvuruOlustur();
+
+        MvcResult result = mockMvc.perform(get("/api/recruitment/candidates/" + candidateId + "/cv"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"cv.pdf\""))
+                .andReturn();
+
+        assertThat(result.getResponse().getContentAsByteArray())
+                .isEqualTo("örnek cv içeriği".getBytes());
     }
 }

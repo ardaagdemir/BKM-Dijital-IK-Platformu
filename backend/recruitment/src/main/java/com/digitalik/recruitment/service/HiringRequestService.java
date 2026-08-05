@@ -8,6 +8,7 @@ import com.digitalik.recruitment.exception.HiringRequestNotFoundException;
 import com.digitalik.recruitment.exception.StaffingNormNotFoundException;
 import com.digitalik.recruitment.repository.HiringRequestRepository;
 import com.digitalik.recruitment.repository.StaffingNormRepository;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
@@ -106,6 +107,20 @@ public class HiringRequestService {
             hiringRequest.rejectByHr();
         }
         return hiringRequestRepository.save(hiringRequest);
+    }
+
+    /**
+     * Bölüm 14.4: {@code /recruitment/hiring-requests} ekranının okuma ucu —
+     * {@code organizationUnitId} verilirse (YONETICI kendi biriminin
+     * bekleyen taleplerini görür) o birimle sınırlı, verilmezse (İK/ADMIN
+     * organizasyon geneli karar verir — bkz. {@link #hrDecide}'daki AYNI
+     * kısıt yokluğu) TÜM talepler döner.
+     */
+    public List<HiringRequest> getAll(Long organizationUnitId) {
+        if (organizationUnitId != null) {
+            return hiringRequestRepository.findByOrganizationUnitIdOrderByIdDesc(organizationUnitId);
+        }
+        return hiringRequestRepository.findAllByOrderByIdDesc();
     }
 
     private HiringRequest findOrThrow(Long id) {

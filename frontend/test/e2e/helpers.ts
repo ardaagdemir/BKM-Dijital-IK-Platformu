@@ -21,6 +21,14 @@ export async function goToOrganization(page: Page, isMobile: boolean) {
   await page.getByRole('link', { name: 'Organizasyon' }).click()
 }
 
+// Bölüm 13.8 — goToOrganization ile AYNI desen.
+export async function goToAudit(page: Page, isMobile: boolean) {
+  if (isMobile) {
+    await page.getByRole('button', { name: 'Menüyü aç' }).click()
+  }
+  await page.getByRole('link', { name: 'Audit Kayıtları' }).click()
+}
+
 // Backend'in isValidNationalId'siyle (bkz. organization/EmployeeService.java,
 // frontend'de schema.ts'teki AYNI algoritma) UYUMLU, rastgele geçerli bir TC
 // Kimlik No üretir — her E2E çalıştırmasında 409 (mükerrer) çakışmasından

@@ -99,10 +99,35 @@ async function requestBlob(path: string): Promise<Blob> {
   return response.blob()
 }
 
+// Bölüm 14.4: `/careers/apply` — CV dosya yükleme, `multipart/form-data`.
+// `performFetch`'ten AYRI: `Content-Type` elle set EDİLMEZ, tarayıcı
+// `FormData` gövdesi için doğru `boundary`'li değeri KENDİSİ üretir.
+async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken()
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, { method: 'POST', headers, body: formData })
+
+  if (!response.ok) {
+    const problem = await parseProblem(response)
+    throw new ApiError(
+      response.status,
+      problem?.title ?? 'Hata',
+      problem?.detail ?? 'Beklenmeyen bir hata oluştu, tekrar deneyin.',
+    )
+  }
+
+  return (await response.json()) as T
+}
+
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   getBlob: (path: string) => requestBlob(path),
+  postMultipart: <T>(path: string, formData: FormData) => requestMultipart<T>(path, formData),
 }
