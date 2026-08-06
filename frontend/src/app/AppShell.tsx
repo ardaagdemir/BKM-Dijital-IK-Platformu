@@ -14,7 +14,7 @@ import {
   TOPBAR_HEIGHT,
 } from './layout.constants'
 import { NavDrawer } from './NavDrawer'
-import { filterNavItemsByRoles, navigationItems, type NavItem } from './navigation'
+import { filterNavItemsByRoles, getBottomNavItems, navigationItems, type NavItem } from './navigation'
 import { Sidebar } from './Sidebar'
 import { TabletExpandOverlay } from './TabletExpandOverlay'
 import { TopBar } from './TopBar'
@@ -39,6 +39,7 @@ export function AppShell({ items: itemsOverride }: AppShellProps = {}) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
 
   const items = filterNavItemsByRoles(itemsOverride ?? navigationItems, user?.roles ?? [])
+  const bottomNavItems = getBottomNavItems(items)
   // md'de sidebar HER ZAMAN rail (bkz. Bölüm 4.2); yalnızca lg/xl'de
   // kullanıcının manuel daraltma tercihi (bkz. useSidebarCollapse) geçerli.
   const sidebarCollapsed = isLargeUp ? desktopCollapsed : true
@@ -58,7 +59,7 @@ export function AppShell({ items: itemsOverride }: AppShellProps = {}) {
       />
       <TabletExpandOverlay items={items} open={tabletOverlayOpen} onClose={() => setTabletOverlayOpen(false)} />
       <NavDrawer items={items} open={mobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} />
-      <BottomNav items={items} currentPath={location.pathname} onMoreClick={() => setMobileDrawerOpen(true)} />
+      <BottomNav items={bottomNavItems} currentPath={location.pathname} onMoreClick={() => setMobileDrawerOpen(true)} />
 
       <Box
         component="main"

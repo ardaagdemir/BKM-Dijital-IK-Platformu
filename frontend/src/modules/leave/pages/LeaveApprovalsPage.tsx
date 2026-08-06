@@ -15,8 +15,7 @@ import * as leaveApi from '../api/leaveApi'
 import { useDecideLeaveRequest } from '../api/useDecideLeaveRequest'
 import { useLeaveTypes } from '../api/useLeaveTypes'
 import { leaveKeys } from '../queryKeys'
-import { RejectLeaveRequestDialog } from '../components/RejectLeaveRequestDialog'
-import type { RejectionReasonFormValues } from '../schema'
+import { RejectionReasonDialog, type RejectionReasonFormValues } from '../../../shared/components/RejectionReasonDialog'
 import type { LeaveRequest } from '../types'
 
 // US-04.2.2: "ekibimin bekleyen talepleri." `leave` modülü `organization`'a
@@ -207,7 +206,7 @@ export function LeaveApprovalsPage() {
         />
       )}
 
-      <RejectLeaveRequestDialog
+      <RejectionReasonDialog
         open={!!rejectTarget}
         employeeLabel={rejectTarget ? (employeeLabelById.get(rejectTarget.employeeId) ?? '') : ''}
         submitting={decideLeaveRequest.isPending}

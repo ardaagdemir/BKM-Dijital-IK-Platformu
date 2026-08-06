@@ -1,19 +1,29 @@
 import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined'
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined'
 import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined'
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined'
+import AssignmentOutlinedIcon from '@mui/icons-material/AssignmentOutlined'
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined'
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined'
+import ChecklistOutlinedIcon from '@mui/icons-material/ChecklistOutlined'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined'
 import EmojiEventsOutlinedIcon from '@mui/icons-material/EmojiEventsOutlined'
 import EventNoteOutlinedIcon from '@mui/icons-material/EventNoteOutlined'
+import EventOutlinedIcon from '@mui/icons-material/EventOutlined'
 import GavelOutlinedIcon from '@mui/icons-material/GavelOutlined'
 import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined'
 import FlightTakeoffOutlinedIcon from '@mui/icons-material/FlightTakeoffOutlined'
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined'
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined'
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
 import HowToRegOutlinedIcon from '@mui/icons-material/HowToRegOutlined'
 import LabelOutlinedIcon from '@mui/icons-material/LabelOutlined'
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined'
+import MedicalServicesOutlinedIcon from '@mui/icons-material/MedicalServicesOutlined'
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
+import NoteAltOutlinedIcon from '@mui/icons-material/NoteAltOutlined'
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined'
 import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined'
 import PollOutlinedIcon from '@mui/icons-material/PollOutlined'
@@ -43,8 +53,11 @@ import { LeaveTypesPage } from '../modules/leave/pages/LeaveTypesPage'
 import { EmployeeCreatePage } from '../modules/organization/pages/EmployeeCreatePage'
 import { EmployeeDetailPage } from '../modules/organization/pages/EmployeeDetailPage'
 import { EmployeesListPage } from '../modules/organization/pages/EmployeesListPage'
+import { JobDescriptionsPage } from '../modules/organization/pages/JobDescriptionsPage'
 import { JobTitlesPage } from '../modules/organization/pages/JobTitlesPage'
+import { OrganizationChartPage } from '../modules/organization/pages/OrganizationChartPage'
 import { OrganizationLayout } from '../modules/organization/pages/OrganizationLayout'
+import { PolicyDocumentsPage } from '../modules/organization/pages/PolicyDocumentsPage'
 import { UnitsPage } from '../modules/organization/pages/UnitsPage'
 import { CandidateDetailPage } from '../modules/recruitment/pages/CandidateDetailPage'
 import { CandidatesPage } from '../modules/recruitment/pages/CandidatesPage'
@@ -57,6 +70,13 @@ import { AwardsPage } from '../modules/discipline/pages/AwardsPage'
 import { DisciplinaryCaseDetailPage } from '../modules/discipline/pages/DisciplinaryCaseDetailPage'
 import { DisciplinaryCasesPage } from '../modules/discipline/pages/DisciplinaryCasesPage'
 import { WarningsPage } from '../modules/discipline/pages/WarningsPage'
+import { AppointmentBookingPage } from '../modules/amenities/pages/AppointmentBookingPage'
+import { AppointmentNotesPage } from '../modules/amenities/pages/AppointmentNotesPage'
+import { ClubDetailPage } from '../modules/amenities/pages/ClubDetailPage'
+import { ClubMembershipRequestsPage } from '../modules/amenities/pages/ClubMembershipRequestsPage'
+import { ClubsManagePage } from '../modules/amenities/pages/ClubsManagePage'
+import { ClubsPage } from '../modules/amenities/pages/ClubsPage'
+import { ServiceOfferingsPage } from '../modules/amenities/pages/ServiceOfferingsPage'
 import { MySuggestionsPage } from '../modules/feedback/pages/MySuggestionsPage'
 import { SuggestionCategoriesPage } from '../modules/feedback/pages/SuggestionCategoriesPage'
 import { SuggestionsManagePage } from '../modules/feedback/pages/SuggestionsManagePage'
@@ -83,10 +103,25 @@ import { TeamAssessmentsPage } from '../modules/performance/pages/TeamAssessment
 import { Forbidden } from './Forbidden'
 import { HomePlaceholder } from './HomePlaceholder'
 
+// Menü yeniden düzenlemesi (13.2 revizyonu): masaüstü/tablet menüsü bu 6
+// SABİT grup altında toplanır (bkz. Sidebar/GroupedNavList) — sıra burada
+// TANIMLIDIR ve menüde gösterilecek sıraya BİREBİR karşılık gelir.
+export const NAV_GROUPS = [
+  'Genel',
+  'Organizasyon',
+  'Çalışan İşlemleri',
+  'İK Süreçleri',
+  'Çalışan Deneyimi',
+  'Yönetim',
+] as const
+
+export type NavGroup = (typeof NAV_GROUPS)[number]
+
 export type NavItem = {
   label: string
   path: string
   icon: ReactElement
+  group: NavGroup
   // undefined => oturum açmış HER rol görür. Bölüm 4.4: bu yalnızca görsel
   // bir filtredir, gerçek yetkilendirme her zaman backend'de uygulanır.
   roles?: string[]
@@ -113,7 +148,7 @@ export const appRoutes: AppRoute[] = [
   {
     path: '/',
     element: <HomePlaceholder />,
-    handle: { title: 'Ana Sayfa', nav: { label: 'Ana Sayfa', icon: <HomeOutlinedIcon /> } },
+    handle: { title: 'Ana Sayfa', nav: { group: 'Genel', label: 'Ana Sayfa', icon: <HomeOutlinedIcon /> } },
   },
   {
     path: '/organization',
@@ -131,7 +166,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Organizasyon',
-      nav: { label: 'Organizasyon', icon: <ApartmentOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'Organizasyon', label: 'Organizasyon', icon: <ApartmentOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
     children: [
       { index: true, element: <Navigate to="units" replace /> },
@@ -160,7 +195,15 @@ export const appRoutes: AppRoute[] = [
             <EmployeesListPage />
           </ProtectedRoute>
         ),
-        handle: { title: 'Çalışanlar' },
+        // Menü yeniden düzenlemesi (13.2 revizyonu): önceden bu route'un
+        // yalnızca `OrganizationLayout`'un sabit sekme çubuğundan ulaşılabilir
+        // olması (bkz. o dosya) BottomNav'ın "Çalışanlar" kısayolu için
+        // doğrudan bir menü girişi de gerektirdi — route/rol/element AYNI,
+        // yalnızca menüde GÖRÜNÜRLÜK eklendi.
+        handle: {
+          title: 'Çalışanlar',
+          nav: { group: 'Organizasyon', label: 'Çalışanlar', icon: <BadgeOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+        },
       },
       {
         path: 'employees/new',
@@ -186,7 +229,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'İzin Türleri',
-      nav: { label: 'İzin Türleri', icon: <CategoryOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'İzin Türleri', icon: <CategoryOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -200,7 +243,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'İzin Bakiyem',
-      nav: { label: 'İzin Bakiyem', icon: <AccountBalanceWalletOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'İzin Bakiyem', icon: <AccountBalanceWalletOutlinedIcon /> },
     },
   },
   {
@@ -212,7 +255,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'İzin Taleplerim',
-      nav: { label: 'İzin Taleplerim', icon: <EventAvailableOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'İzin Taleplerim', icon: <EventAvailableOutlinedIcon /> },
     },
   },
   {
@@ -236,7 +279,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Onay Bekleyenler',
-      nav: { label: 'Onay Bekleyenler', icon: <FactCheckOutlinedIcon />, roles: ['YONETICI'] },
+      nav: { group: 'İK Süreçleri', label: 'Onay Bekleyenler', icon: <FactCheckOutlinedIcon />, roles: ['YONETICI'] },
     },
   },
   {
@@ -252,7 +295,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Norm Kadrolar',
-      nav: { label: 'Norm Kadrolar', icon: <AssignmentIndOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Norm Kadrolar', icon: <AssignmentIndOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -267,7 +310,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Adaylar',
-      nav: { label: 'Adaylar', icon: <PersonSearchOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Adaylar', icon: <PersonSearchOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -303,7 +346,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'İşe Alım Talepleri',
-      nav: { label: 'İşe Alım Talepleri', icon: <WorkOutlineOutlinedIcon />, roles: ['ADMIN', 'IK', 'YONETICI'] },
+      nav: { group: 'İK Süreçleri', label: 'İşe Alım Talepleri', icon: <WorkOutlineOutlinedIcon />, roles: ['ADMIN', 'IK', 'YONETICI'] },
     },
   },
   {
@@ -318,7 +361,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Performans Ayarları',
-      nav: { label: 'Performans Ayarları', icon: <TrackChangesOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Performans Ayarları', icon: <TrackChangesOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
     children: [
       { index: true, element: <Navigate to="goals" replace /> },
@@ -338,7 +381,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Öz Değerlendirme',
-      nav: { label: 'Öz Değerlendirme', icon: <RateReviewOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'Öz Değerlendirme', icon: <RateReviewOutlinedIcon /> },
     },
   },
   {
@@ -351,7 +394,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Ekip Değerlendirmeleri',
-      nav: { label: 'Ekip Değerlendirmeleri', icon: <SupervisorAccountOutlinedIcon />, roles: ['YONETICI'] },
+      nav: { group: 'İK Süreçleri', label: 'Ekip Değerlendirmeleri', icon: <SupervisorAccountOutlinedIcon />, roles: ['YONETICI'] },
     },
   },
   {
@@ -365,7 +408,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Performans Sonuçlarım',
-      nav: { label: 'Performans Sonuçlarım', icon: <TrendingUpOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'Performans Sonuçlarım', icon: <TrendingUpOutlinedIcon /> },
     },
   },
   {
@@ -393,7 +436,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Çalışma Modelleri',
-      nav: { label: 'Çalışma Modelleri', icon: <ScheduleOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Çalışma Modelleri', icon: <ScheduleOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -417,7 +460,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Devam Kayıtları',
-      nav: { label: 'Devam Kayıtları', icon: <EventNoteOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Devam Kayıtları', icon: <EventNoteOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -429,7 +472,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Vardiya Sapmaları',
-      nav: { label: 'Vardiya Sapmaları', icon: <WarningAmberOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Vardiya Sapmaları', icon: <WarningAmberOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -445,7 +488,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Puantaj',
-      nav: { label: 'Puantaj', icon: <CalendarMonthOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'Puantaj', icon: <CalendarMonthOutlinedIcon /> },
     },
   },
   {
@@ -459,7 +502,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Eğitim Kataloğu',
-      nav: { label: 'Eğitim Kataloğu', icon: <SchoolOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Eğitim Kataloğu', icon: <SchoolOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -472,7 +515,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Eğitimlerim',
-      nav: { label: 'Eğitimlerim', icon: <MenuBookOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'Eğitimlerim', icon: <MenuBookOutlinedIcon /> },
     },
   },
   {
@@ -487,7 +530,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Eğitim Onayları',
-      nav: { label: 'Eğitim Onayları', icon: <HowToRegOutlinedIcon />, roles: ['YONETICI'] },
+      nav: { group: 'İK Süreçleri', label: 'Eğitim Onayları', icon: <HowToRegOutlinedIcon />, roles: ['YONETICI'] },
     },
   },
   {
@@ -500,7 +543,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Tamamlanan Eğitimler',
-      nav: { label: 'Tamamlanan Eğitimler', icon: <TaskAltOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Tamamlanan Eğitimler', icon: <TaskAltOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -515,7 +558,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Seyahat Taleplerim',
-      nav: { label: 'Seyahat Taleplerim', icon: <FlightTakeoffOutlinedIcon /> },
+      nav: { group: 'Çalışan İşlemleri', label: 'Seyahat Taleplerim', icon: <FlightTakeoffOutlinedIcon /> },
     },
   },
   {
@@ -541,7 +584,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Uyarı Kayıtları',
-      nav: { label: 'Uyarı Kayıtları', icon: <ReportProblemOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Uyarı Kayıtları', icon: <ReportProblemOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -554,7 +597,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Ceza Süreçleri',
-      nav: { label: 'Ceza Süreçleri', icon: <GavelOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Ceza Süreçleri', icon: <GavelOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -576,7 +619,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Ödül Kayıtları',
-      nav: { label: 'Ödül Kayıtları', icon: <EmojiEventsOutlinedIcon />, roles: ['YONETICI', 'ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Ödül Kayıtları', icon: <EmojiEventsOutlinedIcon />, roles: ['YONETICI', 'ADMIN', 'IK'] },
     },
   },
   {
@@ -589,7 +632,7 @@ export const appRoutes: AppRoute[] = [
         <SurveysPage />
       </ProtectedRoute>
     ),
-    handle: { title: 'Anketler', nav: { label: 'Anketler', icon: <PollOutlinedIcon /> } },
+    handle: { title: 'Anketler', nav: { group: 'Çalışan Deneyimi', label: 'Anketler', icon: <PollOutlinedIcon /> } },
   },
   {
     // US-08E.1.2: nav girişi YOK, `/surveys` listesinden ulaşılır.
@@ -620,7 +663,7 @@ export const appRoutes: AppRoute[] = [
         <MySuggestionsPage />
       </ProtectedRoute>
     ),
-    handle: { title: 'Taleplerim', nav: { label: 'Taleplerim', icon: <TipsAndUpdatesOutlinedIcon /> } },
+    handle: { title: 'Taleplerim', nav: { group: 'Çalışan Deneyimi', label: 'Taleplerim', icon: <TipsAndUpdatesOutlinedIcon /> } },
   },
   {
     // US-08F.1.2: durum güncelleme — backend'de rol kısıtı YOK, frontend'de
@@ -634,7 +677,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Talep Yönetimi',
-      nav: { label: 'Talep Yönetimi', icon: <RateReviewOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Talep Yönetimi', icon: <RateReviewOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
   },
   {
@@ -650,8 +693,133 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Talep Kategorileri',
-      nav: { label: 'Talep Kategorileri', icon: <LabelOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+      nav: { group: 'İK Süreçleri', label: 'Talep Kategorileri', icon: <LabelOutlinedIcon />, roles: ['ADMIN', 'IK'] },
     },
+  },
+  {
+    // US-08G.1.1: GET /api/clubs backend'de rol kısıtlı DEĞİL — liste
+    // HERKESE (oturumlu) görünür (bkz. ClubController javadoc'u).
+    path: '/clubs',
+    element: (
+      <ProtectedRoute>
+        <ClubsPage />
+      </ProtectedRoute>
+    ),
+    handle: { title: 'Kulüpler', nav: { group: 'Çalışan Deneyimi', label: 'Kulüpler', icon: <GroupsOutlinedIcon /> } },
+  },
+  {
+    // US-08G.1.2: nav girişi YOK, `/clubs` listesinden ulaşılır.
+    path: '/clubs/:id',
+    element: (
+      <ProtectedRoute>
+        <ClubDetailPage />
+      </ProtectedRoute>
+    ),
+    handle: { title: 'Kulüp Detayı' },
+  },
+  {
+    // US-08G.1.1: roadmap KENDİSİ ayrı bir route olarak İTEMİZE ETMEDİ ama
+    // `ClubController` TAM CRUD sunduğundan (+ lider ataması) eklendi —
+    // bkz. `ClubsManagePage`'in KENDİ dosyasındaki not.
+    path: '/clubs/manage',
+    element: (
+      <ProtectedRoute roles={['ADMIN', 'IK']}>
+        <ClubsManagePage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Kulüp Yönetimi',
+      nav: { group: 'İK Süreçleri', label: 'Kulüp Yönetimi', icon: <ManageAccountsOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+    },
+  },
+  {
+    // US-08G.1.1 kabul kriteri: "Talep İK onayına gider."
+    path: '/clubs/membership-requests',
+    element: (
+      <ProtectedRoute roles={['ADMIN', 'IK']}>
+        <ClubMembershipRequestsPage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Kulüp Üyelik Talepleri',
+      nav: { group: 'İK Süreçleri', label: 'Kulüp Üyelik Talepleri', icon: <ChecklistOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+    },
+  },
+  {
+    // US-08H.1.1: roadmap'in rol tablosu — yalnızca ADMIN (IK dahil DEĞİL).
+    path: '/appointments/services',
+    element: (
+      <ProtectedRoute roles={['ADMIN']}>
+        <ServiceOfferingsPage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Hizmet ve Slot Yönetimi',
+      nav: { group: 'İK Süreçleri', label: 'Hizmet ve Slot Yönetimi', icon: <MedicalServicesOutlinedIcon />, roles: ['ADMIN'] },
+    },
+  },
+  {
+    // US-08H.1.2: Herkes (oturumlu) kendi randevusunu alır/görür.
+    path: '/appointments/book',
+    element: (
+      <ProtectedRoute>
+        <AppointmentBookingPage />
+      </ProtectedRoute>
+    ),
+    handle: { title: 'Randevu Al', nav: { group: 'Çalışan İşlemleri', label: 'Randevu Al', icon: <EventOutlinedIcon /> } },
+  },
+  {
+    // US-08H.1.3 (SEC-020): `GET .../note` backend'de yalnızca ADMIN/IK'ya
+    // açık (bkz. AppointmentNoteController'ın `@PreAuthorize`'ı) — bu
+    // rota AYNI kısıta frontend'de de uyuyor.
+    path: '/appointments/notes',
+    element: (
+      <ProtectedRoute roles={['ADMIN', 'IK']}>
+        <AppointmentNotesPage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Randevu Notları',
+      nav: { group: 'İK Süreçleri', label: 'Randevu Notları', icon: <NoteAltOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+    },
+  },
+  {
+    // US-08I.1.1: roadmap'in rol tablosu — ADMIN, IK. Bağımsız bir route
+    // (`organization.OrganizationLayout`'un ADMIN/IK-only sekme çubuğuna
+    // KASITLI OLARAK EKLENMEDİ — o sabit `TABS` dizisi 13.4'ün birim/unvan/
+    // çalışan CRUD'ına özgü, 8I'nin KENDİ roadmap satırıyla karışmaması için).
+    path: '/documents/policies',
+    element: (
+      <ProtectedRoute roles={['ADMIN', 'IK']}>
+        <PolicyDocumentsPage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Politika Dokümanları',
+      nav: { group: 'Organizasyon', label: 'Politika Dokümanları', icon: <DescriptionOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+    },
+  },
+  {
+    path: '/documents/job-descriptions',
+    element: (
+      <ProtectedRoute roles={['ADMIN', 'IK']}>
+        <JobDescriptionsPage />
+      </ProtectedRoute>
+    ),
+    handle: {
+      title: 'Görev Tanımları',
+      nav: { group: 'Organizasyon', label: 'Görev Tanımları', icon: <AssignmentOutlinedIcon />, roles: ['ADMIN', 'IK'] },
+    },
+  },
+  {
+    // US-08I.1.3: roadmap'in rol tablosu — Herkes (oturumlu).
+    path: '/organization/chart',
+    element: (
+      <ProtectedRoute>
+        <OrganizationChartPage />
+      </ProtectedRoute>
+    ),
+    handle: { title: 'Organizasyon Şeması', nav: { group: 'Organizasyon', label: 'Organizasyon Şeması', icon: <AccountTreeOutlinedIcon /> } },
   },
   {
     path: '/audit',
@@ -665,7 +833,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Audit Kayıtları',
-      nav: { label: 'Audit Kayıtları', icon: <HistoryOutlinedIcon />, roles: ['ADMIN'] },
+      nav: { group: 'Yönetim', label: 'Audit Kayıtları', icon: <HistoryOutlinedIcon />, roles: ['ADMIN'] },
     },
   },
   {
@@ -693,7 +861,7 @@ export const appRoutes: AppRoute[] = [
     ),
     handle: {
       title: 'Kullanıcılar',
-      nav: { label: 'Kullanıcılar', icon: <PeopleAltOutlinedIcon />, roles: ['ADMIN'] },
+      nav: { group: 'Yönetim', label: 'Kullanıcılar', icon: <PeopleAltOutlinedIcon />, roles: ['ADMIN'] },
     },
   },
   {
@@ -712,10 +880,67 @@ export const appRoutes: AppRoute[] = [
   },
 ]
 
-export const navigationItems: NavItem[] = appRoutes
-  .filter((route): route is AppRoute & { handle: { nav: Omit<NavItem, 'path'> } } => !!route.handle.nav)
-  .map((route) => ({ ...route.handle.nav, path: route.path }))
+// Menü yeniden düzenlemesi (13.2 revizyonu): "Çalışanlar" kısayolu (BottomNav
+// için) `OrganizationLayout`'un iç içe (relative path'li) `employees` alt
+// route'una eklenince, ÖNCEKİ sığ (yalnızca `appRoutes`'un ÜST seviyesini
+// tarayan) türetme YETERSİZ kaldı — bu fonksiyon `children`'a REKÜRSİF iner,
+// göreli path'leri ebeveynle BİRLEŞTİRİR (react-router'ın kendi path
+// birleştirme kuralıyla AYNI). Tek kaynak ilkesi KORUNUR — ayrı bir
+// menuConfig İCAT EDİLMEZ.
+function collectNavItems(routes: RouteObject[], parentPath: string): NavItem[] {
+  const items: NavItem[] = []
+  for (const route of routes) {
+    const handle = route.handle as RouteHandle | undefined
+    const fullPath = !route.path
+      ? parentPath
+      : route.path.startsWith('/')
+        ? route.path
+        : `${parentPath === '/' ? '' : parentPath}/${route.path}`
+    if (handle?.nav) {
+      items.push({ ...handle.nav, path: fullPath })
+    }
+    if (route.children) {
+      items.push(...collectNavItems(route.children, fullPath))
+    }
+  }
+  return items
+}
+
+export const navigationItems: NavItem[] = collectNavItems(appRoutes, '/')
 
 export function filterNavItemsByRoles(items: NavItem[], userRoles: string[]): NavItem[] {
   return items.filter((item) => !item.roles || item.roles.some((role) => userRoles.includes(role)))
+}
+
+export type NavItemGroup = { group: NavGroup; items: NavItem[] }
+
+// Menü yeniden düzenlemesi (13.2 revizyonu): açılır-kapanır grup bölümleri
+// (bkz. GroupedNavList) — `NAV_GROUPS`'un TANIMLI sırasına göre döner, rol
+// filtresinden sonra HİÇ öğesi kalmayan bir grup TAMAMEN atlanır (boş bir
+// başlık gösterilmez).
+export function groupNavItems(items: NavItem[]): NavItemGroup[] {
+  return NAV_GROUPS.map((group) => ({ group, items: items.filter((item) => item.group === group) })).filter(
+    (entry) => entry.items.length > 0,
+  )
+}
+
+// Bölüm 4.3 revizyonu: BottomNavigation artık TÜM menüyü değil, sabit bir
+// öncelik listesini gösterir (en fazla 4 kısayol + "Diğer" = 5 öğe).
+// Yalnızca PATH+KISA ETİKET burada tanımlanır — ikon/rol AYRI bir yerde
+// TEKRAR EDİLMEZ, `navigationItems`'teki (zaten rol filtresinden geçmiş)
+// karşılığından okunur; kullanıcının erişemediği bir hedef `items` içinde
+// bulunamayacağından kendiliğinden ATLANIR.
+const BOTTOM_NAV_TARGETS: { path: string; shortLabel: string }[] = [
+  { path: '/', shortLabel: 'Ana Sayfa' },
+  { path: '/organization/employees', shortLabel: 'Çalışanlar' },
+  { path: '/leave/requests', shortLabel: 'İzinler' },
+  { path: '/leave/approvals', shortLabel: 'Onaylar' },
+]
+
+export function getBottomNavItems(roleFilteredItems: NavItem[]): NavItem[] {
+  const itemByPath = new Map(roleFilteredItems.map((item) => [item.path, item]))
+  return BOTTOM_NAV_TARGETS.map(({ path, shortLabel }) => {
+    const match = itemByPath.get(path)
+    return match ? { ...match, label: shortLabel } : null
+  }).filter((item): item is NavItem => item !== null)
 }

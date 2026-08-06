@@ -4,8 +4,11 @@ import type {
   EmployeeAsset,
   EmployeeAssignmentHistoryEntry,
   EmployeeProfile,
+  JobDescription,
   JobTitle,
+  OrganizationChartNode,
   OrganizationUnit,
+  PolicyDocument,
 } from '../../../src/modules/organization/types'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
@@ -19,16 +22,23 @@ export function createOrganizationHandlers(
   initialEmployees: Employee[] = [],
   initialAssets: EmployeeAsset[] = [],
   initialAssignmentHistory: EmployeeAssignmentHistoryEntry[] = [],
+  initialPolicyDocuments: PolicyDocument[] = [],
+  initialJobDescriptions: JobDescription[] = [],
+  initialChart: OrganizationChartNode[] = [],
 ) {
   const jobTitles = [...initialJobTitles]
   const units = [...initialUnits]
   const employees = [...initialEmployees]
   const assets = [...initialAssets]
   const assignmentHistory = [...initialAssignmentHistory]
+  const policyDocuments = [...initialPolicyDocuments]
+  const jobDescriptions = [...initialJobDescriptions]
   const profiles = new Map<number, EmployeeProfile>()
   let nextJobTitleId = jobTitles.reduce((max, jt) => Math.max(max, jt.id), 0) + 1
   let nextUnitId = units.reduce((max, unit) => Math.max(max, unit.id), 0) + 1
   let nextAssetId = assets.reduce((max, asset) => Math.max(max, asset.id), 0) + 1
+  let nextPolicyDocumentId = policyDocuments.reduce((max, d) => Math.max(max, d.id), 0) + 1
+  let nextJobDescriptionId = jobDescriptions.reduce((max, d) => Math.max(max, d.id), 0) + 1
 
   return [
     http.get(`${BASE_URL}/api/organization/units`, () => HttpResponse.json(units)),
@@ -283,5 +293,104 @@ export function createOrganizationHandlers(
       const employeeId = Number(params.employeeId)
       return HttpResponse.json(assignmentHistory.filter((entry) => entry.employeeId === employeeId))
     }),
+
+    // Bölüm 14.7/8I — `PolicyDocumentService.upload`'daki AYNI kurallar.
+    http.get(`${BASE_URL}/api/documents`, () => HttpResponse.json(policyDocuments)),
+    http.post(`${BASE_URL}/api/documents`, async ({ request }) => {
+      const formData = await request.formData()
+      const title = formData.get('title') as string | null
+      const previousVersionIdRaw = formData.get('previousVersionId') as string | null
+      const file = formData.get('file') as File | null
+
+      if (!file || file.size === 0) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Geçersiz istek', status: 400, detail: 'Doküman dosyası boş olamaz.' },
+          { status: 400 },
+        )
+      }
+
+      let version = 1
+      let resolvedTitle = title
+      let previousVersionId: number | null = null
+      if (previousVersionIdRaw) {
+        previousVersionId = Number(previousVersionIdRaw)
+        const previous = policyDocuments.find((d) => d.id === previousVersionId)
+        if (!previous) {
+          return HttpResponse.json(
+            { type: 'about:blank', title: 'Bulunamadı', status: 404, detail: 'Doküman bulunamadı.' },
+            { status: 404 },
+          )
+        }
+        if (previous.status !== 'ACTIVE') {
+          return HttpResponse.json(
+            {
+              type: 'about:blank',
+              title: 'Geçersiz istek',
+              status: 400,
+              detail: 'Yalnızca güncel (aktif) bir versiyon üzerinden yeni versiyon yüklenebilir.',
+            },
+            { status: 400 },
+          )
+        }
+        version = previous.version + 1
+        resolvedTitle = previous.title
+        previous.status = 'ARCHIVED'
+      } else if (!title || !title.trim()) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Geçersiz istek', status: 400, detail: 'Başlık boş olamaz.' },
+          { status: 400 },
+        )
+      }
+
+      const created: PolicyDocument = {
+        id: nextPolicyDocumentId++,
+        title: resolvedTitle!,
+        version,
+        fileName: file.name,
+        status: 'ACTIVE',
+        previousVersionId,
+      }
+      policyDocuments.push(created)
+      return HttpResponse.json(created, { status: 201 })
+    }),
+    http.get(`${BASE_URL}/api/documents/:id/document`, ({ params }) => {
+      const id = Number(params.id)
+      const document = policyDocuments.find((d) => d.id === id)
+      if (!document) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Bulunamadı', status: 404, detail: 'Doküman bulunamadı.' },
+          { status: 404 },
+        )
+      }
+      return new HttpResponse('örnek dosya içeriği', {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${document.fileName}"`,
+        },
+      })
+    }),
+
+    http.get(`${BASE_URL}/api/documents/job-descriptions`, ({ request }) => {
+      const url = new URL(request.url)
+      const jobTitleId = Number(url.searchParams.get('jobTitleId'))
+      return HttpResponse.json(
+        jobDescriptions.filter((d) => d.jobTitleId === jobTitleId).sort((a, b) => b.id - a.id),
+      )
+    }),
+    http.post(`${BASE_URL}/api/documents/job-descriptions`, async ({ request }) => {
+      const body = (await request.json()) as { jobTitleId: number; content: string }
+      if (!body.content || !body.content.trim()) {
+        return HttpResponse.json(
+          { type: 'about:blank', title: 'Geçersiz istek', status: 400, detail: 'Görev tanımı boş olamaz.' },
+          { status: 400 },
+        )
+      }
+      const created: JobDescription = { id: nextJobDescriptionId++, jobTitleId: body.jobTitleId, content: body.content }
+      jobDescriptions.push(created)
+      return HttpResponse.json(created, { status: 201 })
+    }),
+
+    http.get(`${BASE_URL}/api/organization/chart`, () => HttpResponse.json(initialChart)),
   ]
 }

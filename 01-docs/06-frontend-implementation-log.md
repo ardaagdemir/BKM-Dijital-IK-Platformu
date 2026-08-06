@@ -695,6 +695,91 @@ docker compose build frontend && docker compose up -d frontend   # backend deği
 
 ---
 
-## Genel durum (13.1–13.8 + 14.1–14.6 + 14.7/8A-8C+8E-8F sonrası)
+## 14.7 (8G+8H) — Sosyal Kulüp + Randevu
 
-Toplam: **206 Vitest testi** (unit + entegrasyon), **87 Playwright E2E testi** (+13 skip — 13.1–14.3'ten, artık büyütülmüyor). `npm run build` ve `npm run lint` her bölüm sonunda temiz. Bölüm 13'ün TAMAMI (13.1–13.8) + Bölüm 14.1–14.6 + 14.7'nin 5/9 alt-modülü (8A, 8B, 8C, 8E, 8F) tamamlandı. Sıradaki bölüm: **14.7'nin kalan 3 alt-modülünden biri (8G, 8H, 8I — 8D Bölüm 14.8'e ertelendi)**, roadmap sırasına göre 8G ile devam ediliyor.
+**Özet:** Backend'de her ikisi de AYNI `amenities` modülünde (aynı paket, tek `AmenitiesExceptionHandler`) yaşadığından, frontend'de de TEK bir `amenities` modülünde birlikte geliştirildi. Backend araştırması **hiçbir boşluk bulmadı** — üstelik roadmap'in `0.5 Frontend Blokerleri` tablosundaki İKİ bekleyen doğrulama sorusu (satır 5: kulüp etkinliği rol kısıtı; satır 6: randevu notu yetkili rolü) bu araştırmada KESİN olarak çözüldü (✅ **DOĞRULANDI**, bkz. `05-frontend-roadmap.md`).
+
+**Tasarım kararları:**
+- **Kulüp etkinliği yetkisi GLOBAL bir Spring Security rolü DEĞİL** — `ClubEventService.create`'te kulübe özel `leaderId == requestingEmployeeId` karşılaştırması; frontend `ClubDetailPage`'de "Yeni Etkinlik" butonu bu AYNI karşılaştırmayı istemci tarafında YALNIZCA GÖRSEL bir kısayol olarak tekrarlar (asıl yetki backend'de).
+- **Randevu notu GET'i `@PreAuthorize("hasAnyRole('ADMIN','IK')")` ile kısıtlı, PUT DEĞİL** — bu asimetri nedeniyle not yönetimi TAMAMEN ayrı bir ADMIN/IK ekranına (`AppointmentNotesPage`) taşındı; çalışanın KENDİ randevu ekranında (`AppointmentBookingPage`) not YAZMA/GÖRME arayüzü BİLİNÇLİ OLARAK sunulmadı (roadmap'in "yalnızca yetkili görür" ruhuyla tutarlı, backend'in PUT'u teknik olarak açık bırakmasına rağmen).
+- **`GET /api/clubs/{id}` ve "TÜM slotlar" uçları YOK** — `ClubDetailPage` kulübü `useClubs()` listesinden `find` ile türetir (`SurveyAnswerPage`'deki AYNI karar); randevu/not ekranlarında bir çalışanın TÜM randevularını zaman/hizmet bilgisiyle göstermek için her hizmetin slotları AYRI AYRI (`useQueries`) çekilip TEK bir `slotId→slot` haritasında birleştirilir (`training.TrainingApprovalsPage`'deki AYNI N+1 birleştirme deseni).
+- **`/clubs/manage` roadmap'in KENDİSİ ayrı bir route olarak itemize ETMEDİ** ama `ClubController` TAM CRUD (+ lider ataması) sunduğundan eklendi (`feedback.SuggestionCategoriesPage`'deki AYNI karar) — düzenleme modunda mevcut lideri İSİMLE göstermek için `organizationApi.getEmployee` ile tek seferlik ön-yükleme yapıldı (`EmployeeAutocomplete` yalnızca isimle arar, id'den geriye çözemez).
+- **`leave.RejectLeaveRequestDialog`/`training.RejectEnrollmentDialog` 3. gerçek ihtiyaçta (kulüp üyelik talebi reddi) `shared/components/RejectionReasonDialog.tsx`'e TAŞINDI** — Bölüm 9'un "Nth gerçek ihtiyaçta paylaşılan hale getir" deseni; eski iki modülün kendi kopyaları SİLİNDİ, ikisi de yeni paylaşılan bileşeni kullanıyor (25/25 mevcut test hâlâ yeşil, davranış değişmedi).
+- **Randevu slotu tarih/saati**, codebase'de İLK `DateTimePicker` kullanımı (`AppointmentSlotFormDialog`) — çakışma ön-kontrolü istemci tarafında YAPILMAZ, backend'in "Bu zaman aralığında çakışan bir slot zaten var." hatası tek gerçek kaynak olarak kullanılır.
+
+**Değişen/eklenen dosyalar (backend):** YOK (boşluk bulunamadı).
+
+**Değişen/eklenen dosyalar (frontend):**
+- `frontend/src/shared/components/RejectionReasonDialog.tsx` (yeni, paylaşılan) — `leave`/`training`'in eski kopyaları silindi, ikisi de buna taşındı
+- `frontend/src/modules/amenities/` (yeni modül) — `types.ts`, `schema.ts`, `statusLabels.ts`, `queryKeys.ts`, `api/{clubsApi,appointmentsApi,useClubs,useCreateClub,useUpdateClub,useDeleteClub,useMembershipRequests,useCreateMembershipRequest,useDecideMembershipRequest,useClubEvents,useCreateClubEvent,useServiceOfferings,useCreateServiceOffering,useUpdateServiceOffering,useDeleteServiceOffering,useAppointmentSlots,useAllAppointmentSlots,useCreateAppointmentSlot,useBookAppointment,useAppointments,useAppointmentNote,useUpdateAppointmentNote}.ts`, `components/{ClubFormDialog,ServiceOfferingFormDialog,AppointmentSlotFormDialog}.tsx`, `pages/{ClubsPage,ClubDetailPage,ClubsManagePage,ClubMembershipRequestsPage,ServiceOfferingsPage,AppointmentBookingPage,AppointmentNotesPage}.tsx` (+her biri için test)
+- `frontend/src/app/navigation.tsx` — 7 yeni korumalı rota
+- `frontend/test/msw/handlers/amenities.ts` (yeni) — `createClubHandlers`/`createAppointmentHandlers` (iki AYRI fabrika, `clubsApi`/`appointmentsApi` bölünmesiyle AYNI eksende)
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl amenities -am test   # 40/40 yeşil (boşluk yok, kod değişmedi)
+mvn test                       # tam reactor, sıfır regresyon
+
+cd frontend
+npm run test         # 218 test, 0 hata
+npx tsc -b            # temiz
+npm run lint          # temiz (3 önceden var olan AYNI kategori uyarı — `RejectionReasonDialog` da hem component hem schema export ettiğinden `ToastProvider`/`AuthProvider`'daki AYNI "fast refresh" uyarısına katıldı)
+npm run build         # temiz
+docker compose build frontend && docker compose up -d frontend   # backend değişmediği için YALNIZCA frontend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile tam uçtan uca doğrulandı: kulüp oluşturma (lider atanmış) → NON-leader olarak etkinlik oluşturma denemesi 403 döndürdü → LİDER olarak etkinlik oluşturma başarılı → üyelik talebi oluşturma → onaylama; hizmet oluşturma → slot oluşturma → ÇAKIŞAN slot denemesi 400 döndürdü → randevu alma → AYNI slota ikinci randevu denemesi "Bu slot zaten dolu." ile reddedildi → not YAZMA (PUT, kısıtsız) → not OKUMA (GET, ADMIN olarak) başarılı.
+
+---
+
+## 14.7 (8I) — Doküman, Görev Tanımı, Organizasyon Şeması
+
+**Özet:** 14.7'nin son alt-modülü — üç bağımsız akış, hepsi backend'in `organization` modülünde (mevcut frontend `organization` modülüne EKLENDİ, YENİ bir modül AÇILMADI — backend sınırlarının frontend'e AYNEN yansıması). Backend araştırması BİR boşluk buldu: `PolicyDocumentController` yüklenen belgeyi İNDİRECEK hiçbir uç sunmuyordu (`ExpenseItemController#downloadDocument`/8B'deki AYNI boşluk kategorisi); `GET /{id}/document` eklendi (bkz. `04-implementation-log.md`).
+
+**Tasarım kararları:**
+- **`GET /api/documents` TÜM versiyonları DÜZ bir liste döner, "doküman ailesi" backend'de TEMSİL EDİLMEZ** — istemci tarafında `groupPolicyDocumentVersions` (yeni saf fonksiyon, `assignmentHistory.ts`'deki AYNI "küçük modül-kökü util + kendi test dosyası" deseni) her versiyonun `previousVersionId` zincirini GERİYE doğru izleyip KÖK versiyona ulaşarak dokümanları gruplar.
+- **Versiyon geçmişi `AccordionList`** (roadmap'in KENDİ notu) — `discipline.DisciplinaryCaseDetailPage`'deki AYNI bileşen/desen: her doküman ailesi için TÜM versiyonlar (güncel+arşivlenmiş) TEK bir `AccordionList`'te, `StatusChip` ile ayırt edilerek listelenir.
+- **Yeni versiyon yüklerken `title` alanı HİÇ gösterilmez** — backend önceki versiyondan miras alır (`PolicyDocumentService.upload`'daki kural), istemci göndermez; `PolicyDocumentFormDialog` bu iki modu (`create`/`new-version`) TEK bileşende, koşullu alan gösterimiyle kapsar.
+- **Görev tanımı ekranı, `discipline.WarningsPage`'deki AYNI "önce bağlam seç (burada unvan), sonra kayıt yönet" deseni** — `JobDescriptionController` güncelleme/silme UCU SUNMADIĞINDAN bu bir "ekle-devam-et" günlüğü (warnings/awards'daki AYNI append-only model).
+- **Organizasyon şeması, `organization.UnitTreeDesktop`'taki AYNI `@mui/x-tree-view` `SimpleTreeView`/`TreeItem` deseni** (paket ZATEN kuruluydu, yeni bir grafik kütüphanesi EKLENMEDİ) — her birim bir düğüm, çalışanlar YAPRAK düğüm olarak nested; birim/çalışan `itemId`'leri (`unit-{id}`/`emp-{id}`) ÖNEKLENEREK sayı uzayı çakışması önlendi.
+- **3 yeni route bağımsız, `OrganizationLayout`'un ADMIN/IK-only sabit `TABS` dizisine EKLENMEDİ** — o dizi 13.4'ün birim/unvan/çalışan CRUD'ına özgü; `/organization/chart` roadmap'te "Herkes (oturumlu)" olduğundan ORADA olamazdı.
+- **`leave`/`training`'in "ret gerekçesi" dialog'larının ORTAK bileşene taşınmasıyla AYNI günde**, bu bölümde YENİ bir promosyon YAŞANMADI — mevcut `FileUploadZone` (14.4), `downloadBlob` (14.7/8B), `AccordionList` (13.8) DOĞRUDAN yeniden kullanıldı, hiçbiri değiştirilmedi.
+
+**Değişen/eklenen dosyalar (backend):**
+- `backend/organization/src/main/java/com/digitalik/organization/controller/PolicyDocumentController.java` — `GET /{id}/document`
+- `backend/organization/src/main/java/com/digitalik/organization/service/PolicyDocumentService.java` — `getById(Long id)`
+- `backend/organization/src/test/java/com/digitalik/organization/controller/PolicyDocumentControllerTest.java` — +2 yeni test
+
+**Değişen/eklenen dosyalar (frontend):**
+- `frontend/src/modules/organization/types.ts` — `PolicyDocument`, `JobDescription`, `OrganizationChartNode`/`OrganizationChartEmployee` tipleri eklendi
+- `frontend/src/modules/organization/{schema,queryKeys}.ts` — yeni şema/query key'ler
+- `frontend/src/modules/organization/policyDocumentVersions.ts` (+test) — versiyon gruplama saf fonksiyonu
+- `frontend/src/modules/organization/api/{usePolicyDocuments,useUploadPolicyDocument,useJobDescriptions,useCreateJobDescription,useOrganizationChart}.ts` (yeni) + `organizationApi.ts`'e eklenen fonksiyonlar
+- `frontend/src/modules/organization/components/PolicyDocumentFormDialog.tsx` (yeni)
+- `frontend/src/modules/organization/pages/{PolicyDocumentsPage,JobDescriptionsPage,OrganizationChartPage}.tsx` (+her biri için test)
+- `frontend/src/app/navigation.tsx` — 3 yeni korumalı rota
+- `frontend/test/msw/handlers/organization.ts` — `createOrganizationHandlers`'a 3 yeni opsiyonel parametre + ilgili handler'lar eklendi (yeni bir fabrika AÇILMADI — AYNI backend modülü)
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl organization -am test   # +2 yeni test dahil, 9/9 yeşil (PolicyDocumentControllerTest)
+mvn test                         # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+
+cd frontend
+npm run test         # 228 test, 0 hata
+npx tsc -b            # temiz
+npm run lint          # temiz (3 önceden var olan AYNI kategori uyarı)
+npm run build         # temiz
+docker compose build frontend && docker compose up -d frontend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile tam uçtan uca doğrulandı: v1 yükleme (title+dosya) → `GET .../document` indirilen baytlar `diff` ile YÜKLENENLERLE BİREBİR eşleşiyor → v2 yükleme (`previousVersionId`) → v1'in `ARCHIVED`'a döndüğü doğrulandı; unvan oluşturma → görev tanımı yazma → unvana göre listeleme; `GET /api/organization/chart` mevcut birim/çalışan verisinden İÇ İÇE ağaç yapısını doğru döndürdü.
+
+---
+
+## Genel durum (13.1–13.8 + 14.1–14.6 + 14.7 TAMAMI sonrası)
+
+Toplam: **228 Vitest testi** (unit + entegrasyon), **87 Playwright E2E testi** (+13 skip — 13.1–14.3'ten, artık büyütülmüyor). `npm run build` ve `npm run lint` her bölüm sonunda temiz. Bölüm 13'ün TAMAMI (13.1–13.8) + Bölüm 14.1–14.6 + **14.7'nin 8/9 alt-modülünün TAMAMI** (8A, 8B, 8C, 8E, 8F, 8G, 8H, 8I — 8D Bölüm 14.8'e BİLİNÇLİ OLARAK ertelendi) tamamlandı. Sıradaki bölüm: **Bölüm 14.8 (Bölüm 9 — Kurumsal Entegrasyonlar ve Altyapı'nın frontend karşılığı) veya 14.7/8D (Bordro ve Bordroya Hazırlık)**, hangisiyle devam edileceği kullanıcı tercihine bağlı.

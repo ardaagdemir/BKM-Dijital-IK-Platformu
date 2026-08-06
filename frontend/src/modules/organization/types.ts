@@ -114,3 +114,41 @@ export type EmployeeAssignmentHistoryEntry = {
   startDate: string
   endDate: string | null
 }
+
+// Bölüm 14.7/8I — backend DTO'larıyla BİREBİR eşleşir (bkz. organization.dto.*).
+
+export type PolicyDocumentStatus = 'ACTIVE' | 'ARCHIVED'
+
+export type PolicyDocument = {
+  id: number
+  title: string
+  version: number
+  fileName: string
+  status: PolicyDocumentStatus
+  previousVersionId: number | null
+}
+
+export type JobDescription = {
+  id: number
+  jobTitleId: number
+  content: string
+}
+
+export type CreateJobDescriptionRequest = {
+  jobTitleId: number
+  content: string
+}
+
+export type OrganizationChartEmployee = {
+  id: number
+  firstName: string
+  lastName: string
+  jobTitleName: string | null
+}
+
+export type OrganizationChartNode = {
+  id: number
+  name: string
+  employees: OrganizationChartEmployee[]
+  children: OrganizationChartNode[]
+}

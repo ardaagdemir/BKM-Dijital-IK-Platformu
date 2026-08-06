@@ -5,10 +5,12 @@ import com.digitalik.organization.entity.PolicyDocument;
 import com.digitalik.organization.service.PolicyDocumentService;
 import java.io.IOException;
 import java.util.List;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -52,6 +54,18 @@ public class PolicyDocumentController {
     @GetMapping
     public List<PolicyDocumentResponse> getAll() {
         return policyDocumentService.getAll().stream().map(PolicyDocumentController::toResponse).toList();
+    }
+
+    // `travel.ExpenseItemController#downloadDocument`'teki AYNI desen —
+    // sibling uçlarla (upload/getAll) AYNI rol duruşu: kısıtlama YOK.
+    @GetMapping("/{id}/document")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable Long id) {
+        PolicyDocument document = policyDocumentService.getById(id);
+        String fileName = document.getFileName().replace("\"", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(document.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(document.getDocumentData());
     }
 
     private static PolicyDocumentResponse toResponse(PolicyDocument document) {

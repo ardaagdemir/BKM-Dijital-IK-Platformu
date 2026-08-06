@@ -14,8 +14,8 @@ import type { NavItem } from './navigation'
 // role-kısıtlı bir test öğesi kullanılıyor (Bölüm 13.3'ün menuConfig'i İCAT
 // EDİLMİYOR, yalnızca mevcut filtreleme mekanizması test ediliyor).
 const testItems: NavItem[] = [
-  { label: 'Ana Sayfa', path: '/', icon: <span /> },
-  { label: 'Yönetim Paneli', path: '/yonetim', icon: <span />, roles: ['ADMIN'] },
+  { label: 'Ana Sayfa', path: '/', icon: <span />, group: 'Genel' },
+  { label: 'Yönetim Paneli', path: '/yonetim', icon: <span />, group: 'Yönetim', roles: ['ADMIN'] },
 ]
 
 function renderAppShell() {

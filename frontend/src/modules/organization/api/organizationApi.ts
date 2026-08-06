@@ -4,6 +4,7 @@ import type {
   AssignEmployeeRequest,
   CreateEmployeeAssetRequest,
   CreateEmployeeRequest,
+  CreateJobDescriptionRequest,
   CreateOrganizationUnitRequest,
   Employee,
   EmployeeAsset,
@@ -11,9 +12,12 @@ import type {
   EmployeeProfile,
   EmployeeProfileRequest,
   EmployeeSearchParams,
+  JobDescription,
   JobTitle,
   JobTitleRequest,
+  OrganizationChartNode,
   OrganizationUnit,
+  PolicyDocument,
   ReturnEmployeeAssetRequest,
 } from '../types'
 
@@ -139,4 +143,43 @@ export function listAssignmentHistory(employeeId: number): Promise<EmployeeAssig
   return apiClient.get<EmployeeAssignmentHistoryEntry[]>(
     `/api/organization/employees/${employeeId}/assignment-history`,
   )
+}
+
+export function listPolicyDocuments(): Promise<PolicyDocument[]> {
+  return apiClient.get<PolicyDocument[]>('/api/documents')
+}
+
+// `recruitment.applyAsCandidate`'teki AYNI multipart deseni. `title`
+// YENİ VERSİYON yüklerken GÖNDERİLMEZ (backend önceki versiyondan miras
+// alır, bkz. PolicyDocumentService.upload).
+export function uploadPolicyDocument(params: {
+  title?: string
+  previousVersionId?: number
+  file: File
+}): Promise<PolicyDocument> {
+  const formData = new FormData()
+  if (params.title) {
+    formData.set('title', params.title)
+  }
+  if (params.previousVersionId) {
+    formData.set('previousVersionId', String(params.previousVersionId))
+  }
+  formData.set('file', params.file)
+  return apiClient.postMultipart<PolicyDocument>('/api/documents', formData)
+}
+
+export function downloadPolicyDocument(id: number): Promise<Blob> {
+  return apiClient.getBlob(`/api/documents/${id}/document`)
+}
+
+export function listJobDescriptions(jobTitleId: number): Promise<JobDescription[]> {
+  return apiClient.get<JobDescription[]>(`/api/documents/job-descriptions?jobTitleId=${jobTitleId}`)
+}
+
+export function createJobDescription(request: CreateJobDescriptionRequest): Promise<JobDescription> {
+  return apiClient.post<JobDescription>('/api/documents/job-descriptions', request)
+}
+
+export function getOrganizationChart(): Promise<OrganizationChartNode[]> {
+  return apiClient.get<OrganizationChartNode[]>('/api/organization/chart')
 }

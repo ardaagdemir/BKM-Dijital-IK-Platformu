@@ -18,4 +18,15 @@ export const organizationKeys = {
     assignmentHistory: (id: number) => [...organizationKeys.employees.all, 'assignmentHistory', id] as const,
     me: () => [...organizationKeys.employees.all, 'me'] as const,
   },
+  policyDocuments: {
+    all: ['organization', 'policyDocuments'] as const,
+    list: () => [...organizationKeys.policyDocuments.all, 'list'] as const,
+  },
+  jobDescriptions: {
+    all: ['organization', 'jobDescriptions'] as const,
+    byJobTitle: (jobTitleId: number) => [...organizationKeys.jobDescriptions.all, jobTitleId] as const,
+  },
+  chart: {
+    all: ['organization', 'chart'] as const,
+  },
 }

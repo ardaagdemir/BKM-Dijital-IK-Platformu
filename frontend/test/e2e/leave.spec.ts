@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login } from './helpers'
+import { clickNavLink, login } from './helpers'
 
 // Bölüm 14.3 Testler: "E2E: talep oluşturma, bakiye yetersizse uyarı
 // banner'ı" — tam kapsam. "E2E: onayla → bakiyenin düştüğü, reddet →
@@ -16,10 +16,7 @@ test.describe('İzin Yönetimi (14.3)', () => {
     const typeCode = `E2E${suffix}`
 
     await login(page)
-    if (isMobile) {
-      await page.getByRole('button', { name: 'Menüyü aç' }).click()
-    }
-    await page.getByRole('link', { name: 'İzin Türleri' }).click()
+    await clickNavLink(page, 'İzin Türleri', isMobile)
     await expect(page).toHaveURL(/\/leave\/types/)
 
     await page.getByRole('button', { name: 'Yeni İzin Türü' }).click()
@@ -49,20 +46,14 @@ test.describe('İzin Yönetimi (14.3)', () => {
     const typeCode = `E2EREQ${suffix}`
 
     await login(page)
-    if (isMobile) {
-      await page.getByRole('button', { name: 'Menüyü aç' }).click()
-    }
-    await page.getByRole('link', { name: 'İzin Türleri' }).click()
+    await clickNavLink(page, 'İzin Türleri', isMobile)
     await page.getByRole('button', { name: 'Yeni İzin Türü' }).click()
     await page.getByLabel('İzin Türü Adı').fill(typeName)
     await page.getByLabel('Kod').fill(typeCode)
     await page.getByRole('button', { name: 'Oluştur' }).click()
     await expect(page.getByText('İzin türü oluşturuldu')).toBeVisible()
 
-    if (isMobile) {
-      await page.getByRole('button', { name: 'Menüyü aç' }).click()
-    }
-    await page.getByRole('link', { name: 'İzin Taleplerim' }).click()
+    await clickNavLink(page, 'İzin Taleplerim', isMobile)
     await expect(page).toHaveURL(/\/leave\/requests/)
 
     await page.getByRole('button', { name: 'Yeni Talep' }).click()

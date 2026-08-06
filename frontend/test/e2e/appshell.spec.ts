@@ -101,4 +101,81 @@ test.describe('AppShell (13.2)', () => {
     const seriousOrCritical = results.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? ''))
     expect(seriousOrCritical, JSON.stringify(seriousOrCritical, null, 2)).toEqual([])
   })
+
+  // Menü yeniden düzenlemesi (13.2 revizyonu): masaüstü/tablet menüsü artık
+  // açılır-kapanır GRUPLARA ayrılmış (bkz. GroupedNavList.tsx).
+  test.describe('menü grupları', () => {
+    test('masaüstünde sidebar\'da AKTİF olmayan bir grup başlığına tıklanınca açılır ve içeriği görünür olur', async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'Genişletilmiş sidebar yalnızca md+ genişlikte render edilir')
+      await login(page)
+
+      // '/' rotası "Genel" grubunda — "Yönetim" grubu başlangıçta KAPALI,
+      // içindeki "Kullanıcılar" bağlantısı GÖRÜNÜR DEĞİL.
+      const yonetimHeader = page.getByRole('button', { name: 'Yönetim' })
+      const kullanicilarLink = page.getByRole('link', { name: 'Kullanıcılar' })
+      await expect(yonetimHeader).toHaveAttribute('aria-expanded', 'false')
+      await expect(kullanicilarLink).toBeHidden()
+
+      await yonetimHeader.click()
+
+      await expect(yonetimHeader).toHaveAttribute('aria-expanded', 'true')
+      await expect(kullanicilarLink).toBeVisible()
+
+      await yonetimHeader.click()
+      await expect(yonetimHeader).toHaveAttribute('aria-expanded', 'false')
+      await expect(kullanicilarLink).toBeHidden()
+    })
+
+    test('mobilde "Diğer" tam (gruplu) menüyü açar', async ({ page, isMobile }) => {
+      test.skip(!isMobile, '"Diğer" yalnızca xs/sm alt gezinmede görünür')
+      await login(page)
+
+      await page.getByRole('button', { name: 'Diğer' }).click()
+
+      // Tam menü Drawer'ı, aktif grup ("Genel") açık, diğerleri (ör.
+      // "Yönetim") KAPALI olarak açılır.
+      await expect(page.getByRole('link', { name: 'Ana Sayfa' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Yönetim' })).toHaveAttribute('aria-expanded', 'false')
+    })
+  })
+
+  // Bölüm 4.3 revizyonu: BottomNavigation artık en fazla 5 sabit öğe
+  // gösterir (bkz. navigation.getBottomNavItems) — bu testler dar
+  // viewport'larda YATAY TAŞMA olmadığını (asıl regresyon riski, MUI'nin
+  // `BottomNavigationAction` varsayılan `minWidth: 80`'i 5×80=400px ile
+  // 360-390px genişliğindeki cihazları AŞARDI) doğrudan ÖLÇEREK doğrular.
+  test.describe('alt gezinme — taşma kontrolü', () => {
+    test('alt gezinme çubuğu viewport genişliğini AŞMAZ (yatay taşma yok)', async ({ page, isMobile }) => {
+      test.skip(!isMobile, 'Alt gezinme yalnızca xs/sm genişlikte render edilir')
+      await login(page)
+
+      const bottomNav = page.locator('.MuiBottomNavigation-root')
+      await expect(bottomNav).toBeVisible()
+
+      const overflow = await bottomNav.evaluate((el) => el.scrollWidth - el.clientWidth)
+      expect(overflow, 'alt gezinme çubuğunun scrollWidth\'i clientWidth\'ini AŞMAMALI').toBeLessThanOrEqual(1)
+
+      const viewportWidth = page.viewportSize()?.width ?? 0
+      const boundingBox = await bottomNav.boundingBox()
+      expect(boundingBox?.width ?? 0).toBeLessThanOrEqual(viewportWidth)
+
+      // Sayfanın KENDİSİ de (body) yatay kaydırma GEREKTİRMEMELİ.
+      const bodyOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      )
+      expect(bodyOverflow).toBeLessThanOrEqual(1)
+    })
+
+    test('alt gezinme çubuğunda en fazla 5 öğe (4 kısayol + "Diğer") vardır', async ({ page, isMobile }) => {
+      test.skip(!isMobile, 'Alt gezinme yalnızca xs/sm genişlikte render edilir')
+      await login(page)
+
+      const actions = page.locator('.MuiBottomNavigation-root .MuiBottomNavigationAction-root')
+      await expect(actions).toHaveCount(5)
+      await expect(page.getByRole('button', { name: 'Diğer' })).toBeVisible()
+    })
+  })
 })

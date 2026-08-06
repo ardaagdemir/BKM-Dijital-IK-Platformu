@@ -22,11 +22,3 @@ export const createLeaveRequestSchema = z
   })
 
 export type CreateLeaveRequestFormValues = z.infer<typeof createLeaveRequestSchema>
-
-// Backend'in ApprovalDecisionValidator'ıyla BİREBİR AYNI mesaj — yalnızca
-// RET akışında kullanılır (onayda gerekçe istenmez).
-export const rejectionReasonSchema = z.object({
-  rejectionReason: z.string().min(1, 'Ret gerekçesi zorunludur.'),
-})
-
-export type RejectionReasonFormValues = z.infer<typeof rejectionReasonSchema>

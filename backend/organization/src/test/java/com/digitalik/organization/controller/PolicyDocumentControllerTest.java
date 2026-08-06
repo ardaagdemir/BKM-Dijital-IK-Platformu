@@ -146,4 +146,24 @@ class PolicyDocumentControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Doküman bulunamadı."));
     }
+
+    @Test
+    void belgeIndirilir() throws Exception {
+        JsonNode v1 = uploadV1("İzin Politikası");
+        long v1Id = v1.get("id").asLong();
+
+        mockMvc.perform(get("/api/documents/" + v1Id + "/document"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Content-Disposition", "attachment; filename=\"izin-politikasi.pdf\""))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                        .bytes("v1 içerik".getBytes()));
+    }
+
+    @Test
+    void olmayanBelgeIndirilemezVe404Doner() throws Exception {
+        mockMvc.perform(get("/api/documents/999999/document"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Doküman bulunamadı."));
+    }
 }

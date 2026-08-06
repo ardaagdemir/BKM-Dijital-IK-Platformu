@@ -13,13 +13,6 @@ export const trainingSchema = z.object({
 
 export type TrainingFormValues = z.infer<typeof trainingSchema>
 
-// Backend mesajıyla BİREBİR (bkz. ApprovalDecisionValidator.validate).
-export const rejectionReasonSchema = z.object({
-  rejectionReason: z.string().min(1, 'Ret gerekçesi zorunludur.'),
-})
-
-export type RejectionReasonFormValues = z.infer<typeof rejectionReasonSchema>
-
 // Backend mesajıyla BİREBİR (bkz. TrainingEnrollmentService.complete).
 export const completeEnrollmentSchema = z.object({
   completedDate: z.string().min(1, 'Tamamlanma tarihi boş olamaz.'),

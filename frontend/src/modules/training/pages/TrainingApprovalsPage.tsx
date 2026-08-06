@@ -14,10 +14,9 @@ import { useMyEmployee } from '../../organization/api/useMyEmployee'
 import { useDecideEnrollment } from '../api/useDecideEnrollment'
 import { useTrainings } from '../api/useTrainings'
 import * as trainingApi from '../api/trainingApi'
-import { RejectEnrollmentDialog } from '../components/RejectEnrollmentDialog'
 import { trainingKeys } from '../queryKeys'
-import type { RejectionReasonFormValues } from '../schema'
 import type { TrainingEnrollment } from '../types'
+import { RejectionReasonDialog, type RejectionReasonFormValues } from '../../../shared/components/RejectionReasonDialog'
 
 // US-08A.1.2: "Talep, yöneticiye onaya gider" — `leave.LeaveApprovalsPage`'deki
 // AYNI "kendi birimim = ekibim" istemci taraflı çözümleme + N+1 sorgu
@@ -199,7 +198,7 @@ export function TrainingApprovalsPage() {
         />
       )}
 
-      <RejectEnrollmentDialog
+      <RejectionReasonDialog
         open={!!rejectTarget}
         employeeLabel={rejectTarget ? (employeeLabelById.get(rejectTarget.employeeId) ?? '') : ''}
         submitting={decideEnrollment.isPending}

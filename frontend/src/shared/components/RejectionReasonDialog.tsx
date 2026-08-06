@@ -12,10 +12,18 @@ import TextField from '@mui/material/TextField'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
-import { rejectionReasonSchema, type RejectionReasonFormValues } from '../schema'
+import { z } from 'zod'
 
-type RejectEnrollmentDialogProps = {
+// Backend'in AYNI mesajıyla BİREBİR (bkz. ApprovalDecisionValidator.validate).
+export const rejectionReasonSchema = z.object({
+  rejectionReason: z.string().min(1, 'Ret gerekçesi zorunludur.'),
+})
+
+export type RejectionReasonFormValues = z.infer<typeof rejectionReasonSchema>
+
+type RejectionReasonDialogProps = {
   open: boolean
+  title?: string
   employeeLabel: string
   submitting: boolean
   errorMessage: string | null
@@ -23,15 +31,19 @@ type RejectEnrollmentDialogProps = {
   onCancel: () => void
 }
 
-// `leave.RejectLeaveRequestDialog`'daki AYNI iskelet (bkz. o dosyadaki gerekçe).
-export function RejectEnrollmentDialog({
+// `leave.RejectLeaveRequestDialog`/`training.RejectEnrollmentDialog`'un 3.
+// gerçek ihtiyaçta (kulüp üyelik talebi) ORTAK bileşene taşınmış hali —
+// Bölüm 9'un "Nth gerçek ihtiyaçta paylaşılan hale getir" deseni (bkz.
+// `EmployeeAutocomplete`/`StatusChip`'teki AYNI karar).
+export function RejectionReasonDialog({
   open,
+  title = 'Talebi Reddet',
   employeeLabel,
   submitting,
   errorMessage,
   onSubmit,
   onCancel,
-}: RejectEnrollmentDialogProps) {
+}: RejectionReasonDialogProps) {
   const theme = useTheme()
   const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -53,7 +65,7 @@ export function RejectEnrollmentDialog({
 
   return (
     <Dialog open={open} onClose={onCancel} fullScreen={fullScreen} maxWidth="xs" fullWidth>
-      <DialogTitle>Talebi Reddet</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <DialogContent>
           <Stack spacing={2.5} sx={{ mt: 0.5 }}>

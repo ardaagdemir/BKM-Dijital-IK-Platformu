@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login } from './helpers'
+import { clickNavLink, login } from './helpers'
 
 test.describe('Profil (14.1)', () => {
   test('giriş yapan kullanıcının bilgilerini gösterir', async ({ page }) => {
@@ -23,10 +23,7 @@ test.describe('Kullanıcı-Rol Yönetimi (14.1)', () => {
   }) => {
     await login(page)
 
-    if (isMobile) {
-      await page.getByRole('button', { name: 'Menüyü aç' }).click()
-    }
-    await page.getByRole('link', { name: 'Kullanıcılar' }).click()
+    await clickNavLink(page, 'Kullanıcılar', isMobile)
     await expect(page).toHaveURL(/\/admin\/users$/)
 
     await page.getByRole('link', { name: 'Sistem Yöneticisi' }).click()

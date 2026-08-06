@@ -10,8 +10,8 @@ import { AppShell } from './AppShell'
 import type { NavItem } from './navigation'
 
 const testItems: NavItem[] = [
-  { label: 'Ana Sayfa', path: '/', icon: <span /> },
-  { label: 'Ayarlar', path: '/ayarlar', icon: <span /> },
+  { label: 'Ana Sayfa', path: '/', icon: <span />, group: 'Genel' },
+  { label: 'Ayarlar', path: '/ayarlar', icon: <span />, group: 'Genel' },
 ]
 
 function renderAppShell() {

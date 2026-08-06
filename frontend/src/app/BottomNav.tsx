@@ -14,12 +14,16 @@ type BottomNavProps = {
   onMoreClick: () => void
 }
 
-// Bölüm 4.3: "En sık kullanılan 4 hedef" — bugün gerçekten var olan tek
-// route'un ötesinde SAHTE hedefler EKLENMEZ (bkz. Bölüm 0.3); geri kalan
-// modüller eklendikçe `items` listesi büyür, bu bileşen DEĞİŞMEZ.
+// Bölüm 4.3 revizyonu: `items`, `navigation.getBottomNavItems`'ten gelir —
+// TÜM menü DEĞİL, sabit bir öncelik listesi (Ana Sayfa/Çalışanlar/İzinler/
+// Onaylar), rol filtresinden geçmeyenler zaten ORADA elenmiş olur. Burada
+// yalnızca "en fazla 4" kuralı EK bir güvenlik payı olarak `.slice(0, 4)`
+// ile korunur — `items` her zaman ≤4 gelse de bu bileşen KENDİ başına
+// 5 öğe (4+"Diğer") sınırını asla AŞMAZ.
 export function BottomNav({ items, currentPath, onMoreClick }: BottomNavProps) {
   const navigate = useNavigate()
-  const value = items.some((item) => item.path === currentPath) ? currentPath : MORE_VALUE
+  const visibleItems = items.slice(0, 4)
+  const value = visibleItems.some((item) => item.path === currentPath) ? currentPath : MORE_VALUE
 
   return (
     <Paper
@@ -37,7 +41,7 @@ export function BottomNav({ items, currentPath, onMoreClick }: BottomNavProps) {
       <BottomNavigation
         showLabels
         value={value}
-        sx={{ height: BOTTOM_NAV_HEIGHT }}
+        sx={{ height: BOTTOM_NAV_HEIGHT, overflow: 'hidden' }}
         onChange={(_event, newValue: string) => {
           if (newValue === MORE_VALUE) {
             onMoreClick()
@@ -46,16 +50,26 @@ export function BottomNav({ items, currentPath, onMoreClick }: BottomNavProps) {
           }
         }}
       >
-        {items.map((item) => (
+        {/* `BottomNavigationAction`'ın VARSAYILAN `minWidth: 80`'i, en
+            fazla 5 öğeyle (5×80=400px) dar ekranlarda (ör. 360px genişlikte
+            bir cihaz) YATAY TAŞMAYA yol açar — `minWidth: 0` + `flex: 1`
+            ile her öğe konteynerin GENİŞLİĞİNE eşit paylaşılır, asla taşmaz. */}
+        {visibleItems.map((item) => (
           <BottomNavigationAction
             key={item.path}
             label={item.label}
             value={item.path}
             icon={item.icon}
             aria-current={item.path === currentPath ? 'page' : undefined}
+            sx={{ minWidth: 0, maxWidth: 'none', flex: 1, px: 0.5 }}
           />
         ))}
-        <BottomNavigationAction label="Diğer" value={MORE_VALUE} icon={<MoreHorizIcon />} />
+        <BottomNavigationAction
+          label="Diğer"
+          value={MORE_VALUE}
+          icon={<MoreHorizIcon />}
+          sx={{ minWidth: 0, maxWidth: 'none', flex: 1, px: 0.5 }}
+        />
       </BottomNavigation>
     </Paper>
   )

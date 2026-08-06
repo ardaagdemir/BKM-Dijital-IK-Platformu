@@ -110,3 +110,22 @@ export const returnAssetSchema = z.object({
 })
 
 export type ReturnAssetFormValues = z.infer<typeof returnAssetSchema>
+
+// Bölüm 14.7/8I — backend'in PolicyDocumentService'iyle BİREBİR AYNI
+// mesajlar. `title`, YENİ VERSİYON yüklerken zorunlu DEĞİLDİR (önceki
+// versiyondan miras alınır) — bu yüzden şema seviyesinde ZORUNLU
+// kılınmaz, `PolicyDocumentFormDialog` ilk-versiyon modunda kendi
+// ZORUNLULUK kontrolünü yapar.
+export const policyDocumentSchema = z.object({
+  title: z.string(),
+})
+
+export type PolicyDocumentFormValues = z.infer<typeof policyDocumentSchema>
+
+// Backend'in JobDescriptionService'iyle BİREBİR AYNI mesajlar.
+export const jobDescriptionSchema = z.object({
+  jobTitleId: z.string().min(1, 'Unvan boş olamaz.'),
+  content: z.string().min(1, 'Görev tanımı boş olamaz.'),
+})
+
+export type JobDescriptionFormValues = z.infer<typeof jobDescriptionSchema>

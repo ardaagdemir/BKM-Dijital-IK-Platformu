@@ -3388,3 +3388,29 @@ docker compose build backend && docker compose up -d backend
 ```
 
 **Canlı doğrulama:** Docker backend'e karşı curl ile: süreç açma → savunmasız kapatma denemesi 400 (`"Savunma alınmadan ceza süreci tamamlanamaz."`) → savunma kaydetme → kapatma → `GET .../revisions` ÜÇ revizyonu (açılış/savunma/kapatma), EN YENİSİ İLK sırada, doğru döndürdü.
+
+---
+
+## `organization.controller.PolicyDocumentController#downloadDocument` — politika dokümanı indirme ucu (Bölüm 14.7/8I'nin ön-koşulu)
+
+**Özet:** `ExpenseItemController#downloadDocument` İLE AYNI kategori — 8I (Doküman, Görev Tanımı, Organizasyon Şeması) çalışılırken bulunan bir backend boşluğu. `PolicyDocumentController` yalnızca `POST /` (yükleme) ve `GET /` (meta veri listesi) sunuyordu; `PolicyDocument` entity'si `documentData`/`contentType`/`fileName` alanlarını ZATEN taşıyordu ama bu baytları İNDİRECEK hiçbir uç yoktu — roadmap'in "yükle + versiyonla" kabul kriteri, yüklenen belgeyi GERİ ALABİLMEYİ zımnen gerektiriyor (aksi halde yükleme tek yönlü bir kara kutu olurdu).
+
+**Tasarım kararları:**
+- **`GET /{id}/document`** — `travel.ExpenseItemController#downloadDocument`'teki BİREBİR AYNI iskelet (`Content-Disposition: attachment`, dosya adındaki `"` karakterleri temizlenir).
+- **Rol kısıtı YOK** — kardeş uçlar (`upload`/`getAll`) zaten "kabul kriteri bundan bahsetmiyor" gerekçesiyle kısıtlanmamıştı; YENİ indirme ucu da AYNI tutarlılıkla kısıtlanmadı (`recruitment.CandidateController#downloadCv`'nin AKSİNE — o örnekte CV'nin PII hassasiyeti farklı bir karar gerektirmişti, burada şirket politika dokümanı benzer bir hassasiyet taşımıyor).
+- **`PolicyDocumentService.getById(Long id)`** eklendi — mevcut `PolicyDocumentNotFoundException` ZATEN `OrganizationExceptionHandler`'da eşliydi, yeni bir handler GEREKMEDİ.
+
+**Değişen/eklenen dosyalar:**
+- `backend/organization/src/main/java/com/digitalik/organization/controller/PolicyDocumentController.java` — `GET /{id}/document`
+- `backend/organization/src/main/java/com/digitalik/organization/service/PolicyDocumentService.java` — `getById(Long id)`
+- `backend/organization/src/test/java/com/digitalik/organization/controller/PolicyDocumentControllerTest.java` — +2 yeni test
+
+**Çalıştırma komutları:**
+```bash
+cd backend
+mvn -pl organization -am test   # +2 yeni test dahil, 9/9 yeşil (PolicyDocumentControllerTest)
+mvn test                         # tam reactor, sıfır regresyon
+docker compose build backend && docker compose up -d backend
+```
+
+**Canlı doğrulama:** Docker backend'e karşı curl ile: v1 yükleme (title+dosya) → `GET .../document` indirilen baytlar `diff` ile YÜKLENENLERLE BİREBİR eşleşiyor → v2 yükleme (`previousVersionId`) → `GET /api/documents` listesinde v1'in `status`'u `ARCHIVED`'a döndüğü doğrulandı.

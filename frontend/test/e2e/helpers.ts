@@ -11,22 +11,42 @@ export async function login(page: Page) {
   await expect(page).toHaveURL('/')
 }
 
-// xs/sm'de "Organizasyon" bağlantısı yalnızca hamburger Drawer'ı açıldıktan
-// SONRA erişilebilir (bkz. Bölüm 4.3/13.2) — masaüstünde doğrudan Sidebar'da
-// görünür.
-export async function goToOrganization(page: Page, isMobile: boolean) {
+// Menü yeniden düzenlemesi (13.2 revizyonu): menü artık açılır-kapanır
+// GRUPLARA ayrılmış (bkz. GroupedNavList.tsx) — yalnızca AKTİF route'un
+// grubu varsayılan olarak açıktır. Hedef bağlantı BAŞKA (kapalı) bir
+// grubun içindeyse, önce o grubun başlığına (aynı `<ul>`'u `aria-controls`
+// ile işaret eden düğme) tıklanır. Grup adı BURADA AYRICA TANIMLANMAZ —
+// bağlantının en yakın `id`'li `<ul>` atası ile eşleştirilir (navigation.tsx
+// TEK kaynak olarak KALIR, bu test dosyası kendi kopyasını TUTMAZ).
+async function ensureNavLinkVisible(page: Page, label: string) {
+  const link = page.getByRole('link', { name: label, exact: true })
+  if (await link.isVisible()) {
+    return link
+  }
+  const panelId = await link.locator('xpath=ancestor::ul[@id][1]').getAttribute('id')
+  await page.locator(`[aria-controls="${panelId}"]`).click()
+  await link.waitFor({ state: 'visible' })
+  return link
+}
+
+// xs/sm'de menü öğeleri yalnızca hamburger Drawer'ı açıldıktan SONRA
+// erişilebilir (bkz. Bölüm 4.3/13.2) — masaüstünde doğrudan Sidebar'da,
+// gerekirse kendi grubu açılarak.
+export async function clickNavLink(page: Page, label: string, isMobile: boolean) {
   if (isMobile) {
     await page.getByRole('button', { name: 'Menüyü aç' }).click()
   }
-  await page.getByRole('link', { name: 'Organizasyon' }).click()
+  const link = await ensureNavLinkVisible(page, label)
+  await link.click()
+}
+
+export async function goToOrganization(page: Page, isMobile: boolean) {
+  await clickNavLink(page, 'Organizasyon', isMobile)
 }
 
 // Bölüm 13.8 — goToOrganization ile AYNI desen.
 export async function goToAudit(page: Page, isMobile: boolean) {
-  if (isMobile) {
-    await page.getByRole('button', { name: 'Menüyü aç' }).click()
-  }
-  await page.getByRole('link', { name: 'Audit Kayıtları' }).click()
+  await clickNavLink(page, 'Audit Kayıtları', isMobile)
 }
 
 // Backend'in isValidNationalId'siyle (bkz. organization/EmployeeService.java,

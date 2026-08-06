@@ -79,4 +79,14 @@ public class PolicyDocumentService {
     public List<PolicyDocument> getAll() {
         return policyDocumentRepository.findAll();
     }
+
+    /**
+     * US-08I.1.1'in ön-koşulu: belge dosyasını İNDİRMEK için — {@code
+     * getAll()}'ın döndürdüğü {@code PolicyDocumentResponse} yalnızca
+     * meta veri taşır, dosya baytlarını DEĞİL (`travel.ExpenseItemService.get`'teki
+     * AYNI gerekçe).
+     */
+    public PolicyDocument getById(Long id) {
+        return policyDocumentRepository.findById(id).orElseThrow(PolicyDocumentNotFoundException::new);
+    }
 }
